@@ -4,7 +4,7 @@
 
 import React from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
-import { JOB_LEVEL } from "../../engine/jobs.js";
+import { JOB_LEVEL, siblingJob } from "../../engine/jobs.js";
 import { STAT_NAMES } from "../../engine/stats.js";
 import { useStride } from "../state/StrideContext.js";
 import { jobOptions, statsWithPassives } from "../game/profile.js";
@@ -29,8 +29,13 @@ export default function JobsScreen({ onBack }) {
       </Text>
 
       {options.map((job) => {
-        const reqs = Object.entries(job.requires);
         const levelOk = profile.level >= JOB_LEVEL;
+        const sib = siblingJob(job);
+        const reqs = [
+          { stat: job.signature.stat, need: job.signature.min },
+          { stat: job.branch, need: job.branchMin },
+        ];
+        const favorOk = !sib || (stats[job.branch] || 0) > (stats[sib.branch] || 0);
         return (
           <View key={job.id} style={[styles.card, job.active && styles.cardActive]}>
             <View style={styles.head}>
@@ -43,7 +48,7 @@ export default function JobsScreen({ onBack }) {
 
             <Text style={styles.label}>Requires (level {JOB_LEVEL}+)</Text>
             <View style={styles.reqs}>
-              {reqs.map(([stat, need]) => {
+              {reqs.map(({ stat, need }) => {
                 const have = stats[stat] || 0;
                 const ok = have >= need;
                 return (
@@ -53,6 +58,12 @@ export default function JobsScreen({ onBack }) {
                 );
               })}
             </View>
+            {sib && (
+              <Text style={[styles.favor, favorOk ? styles.reqOk : styles.reqNo]}>
+                Lean into {STAT_NAMES[job.branch]} over {STAT_NAMES[sib.branch]}{" "}
+                ({stats[job.branch] || 0} vs {stats[sib.branch] || 0}) {favorOk ? "✓" : "✗"}
+              </Text>
+            )}
 
             <Text style={styles.label}>Perk</Text>
             <Text style={styles.perk}>
@@ -101,6 +112,7 @@ const styles = StyleSheet.create({
   req: { fontSize: 14, fontWeight: "700" },
   reqOk: { color: colors.accent },
   reqNo: { color: colors.hp },
+  favor: { fontSize: 13, fontWeight: "600", marginTop: spacing(0.75) },
   perk: { color: colors.text, fontSize: 14, fontWeight: "600", marginTop: spacing(0.5) },
   awaken: {
     marginTop: spacing(2), backgroundColor: colors.accent, borderRadius: 12,
