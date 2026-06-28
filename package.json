@@ -1,10 +1,27 @@
 {
-  "name": "stride-engine",
+  "name": "stride",
   "version": "0.1.0",
-  "description": "Stride — pure game-logic engine (text-first, ports to React Native).",
+  "description": "Stride — an offline-capable mobile RPG where real-world steps power a human avatar.",
   "type": "module",
+  "main": "index.js",
   "scripts": {
-    "sim": "node sim.js"
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "sim": "node sim.js",
+    "balance": "node balance.js"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "expo": "~51.0.0",
+    "expo-sensors": "~13.0.9",
+    "expo-status-bar": "~1.12.1",
+    "react": "18.2.0",
+    "react-native": "0.74.5"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0"
   },
   "license": "UNLICENSED"
 }

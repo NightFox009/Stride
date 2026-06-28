@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Stride",
+    "slug": "stride",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "stride",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0e1117"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMotionUsageDescription": "Stride counts your steps to power your avatar's EXP and Energy."
+      }
+    },
+    "android": {
+      "permissions": ["ACTIVITY_RECOGNITION"]
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": ["expo-sensors"]
+  }
+}

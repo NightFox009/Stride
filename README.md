@@ -8,7 +8,41 @@ Think Genopets — but the character you grow is **you**, not a pet.
 
 See **[DESIGN.md](./DESIGN.md)** for the full design.
 
-## Status: engine prototype (text v1)
+## Status: Expo app shell on the engine (v1)
+
+There's now a runnable **React Native + Expo** app that drives the existing
+engine: step tracking (pedometer with a manual fallback), a local offline save,
+and the real **walk → EXP / Energy → level up → spend stat points** loop.
+
+```bash
+npm install
+npm start          # Expo dev server — scan the QR with Expo Go (iOS/Android)
+npm run web        # or run it in a browser (uses the manual "walk" buttons)
+```
+
+On a phone, real steps fuel your avatar automatically. On web/simulator (no
+pedometer), the Home screen shows **+100 / +1,000 / +10,000** buttons so the
+whole loop is testable without walking.
+
+```
+App.js                  provider + loading gate + screen switch
+index.js                Expo entry (registerRootComponent)
+src/
+  game/
+    profile.js          save model; steps -> EXP/Energy via the engine
+    persistence.js      offline save (AsyncStorage; swappable for SQLite)
+  steps/
+    useStepSource.js    expo-sensors Pedometer + manual fallback
+  state/
+    StrideContext.js    app state; the one place steps become progress
+  screens/              ClassSelect / Home / Stats
+  components/ theme.js  shared UI
+```
+
+The app imports the engine directly, so the phone and the text sim share one
+source of truth for all the rules.
+
+## Engine (text v1)
 
 The game logic is a **pure engine** (no graphics, no I/O). It emits events; a UI
 renders them. Today that UI is text; later it'll be a graphical React Native app
@@ -45,5 +79,6 @@ times and reports clear rates so balance is driven by data, not guesswork.
 
 ## Next
 
-Balance pass → React Native + Expo shell (pedometer / HealthKit / Health
-Connect, local SQLite) → in-app text UI → graphical UI → sync, art, more classes.
+Balance pass ✓ → Expo app shell ✓ → in-app dungeon UI (run a floor from the
+phone) → graphical avatar / evolution art → background step sync (HealthKit /
+Health Connect) → cloud sync, more classes.
