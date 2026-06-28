@@ -7,9 +7,8 @@ import { BASE_CLASSES, startingStatsFor } from "../../engine/classes.js";
 import { derive } from "../../engine/stats.js";
 import { effectiveStats, treeFor, maxLevelFor, rankLevelReq } from "../../engine/classTree.js";
 import { getJob, jobsFor, JOB_LEVEL, classWeaponTypes } from "../../engine/jobs.js";
-import { STATS } from "../../engine/stats.js";
 import { equipmentMods, SLOTS, CLASS_GEAR } from "../../engine/items.js";
-import { knowledgeStatBonus, idleRewards } from "../../engine/knowledge.js";
+import { idleRewards } from "../../engine/knowledge.js";
 import {
   upgradeCost,
   rarityUpgradeCost,
@@ -86,9 +85,6 @@ export function combatStats(profile) {
   if (job) for (const [k, v] of Object.entries(job.mods || {})) s[k] = (s[k] || 0) + v;
   const eq = equipmentMods(profile.equipment || {});
   for (const [k, v] of Object.entries(eq)) s[k] = (s[k] || 0) + v;
-  // Knowledge: studied monsters grant a small bonus to every stat.
-  const kb = knowledgeStatBonus(profile.knowledge || {});
-  if (kb) for (const st of STATS) s[st] = (s[st] || 0) + kb;
   return s;
 }
 

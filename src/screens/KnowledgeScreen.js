@@ -3,7 +3,10 @@
 
 import React from "react";
 import { View, Text, ScrollView, StyleSheet } from "react-native";
-import { bestiaryByZone, CORE_STUDY_THRESHOLD, studiedCount, discoveredCount } from "../../engine/knowledge.js";
+import {
+  bestiaryByZone, knowledgeTier, nextTierAt, tieredCount, discoveredCount,
+  CORE_TIER_SIZE, DMG_PER_TIER,
+} from "../../engine/knowledge.js";
 import { useStride } from "../state/StrideContext.js";
 import { colors, spacing } from "../theme.js";
 
@@ -11,18 +14,18 @@ export default function KnowledgeScreen({ onBack }) {
   const { profile } = useStride();
   const k = profile.knowledge || {};
   const zones = bestiaryByZone();
-  const studied = studiedCount(k);
   const discovered = discoveredCount(k);
+  const tiered = tieredCount(k);
   const total = zones.reduce((n, z) => n + z.monsters.length, 0);
-  const bonus = Math.floor(studied / 5);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.back} onPress={onBack}>← Home</Text>
       <Text style={styles.title}>Knowledge Book</Text>
       <Text style={styles.sub}>
-        Discovered {discovered}/{total} · Studied {studied} · all-stat bonus +{bonus}
-        {"\n"}Collect {CORE_STUDY_THRESHOLD} cores of a monster to study it (every 5 studied = +1 to all stats).
+        Discovered {discovered}/{total} · {tiered} monster{tiered === 1 ? "" : "s"} ranked up
+        {"\n"}Every {CORE_TIER_SIZE} cores of a monster raises its tier — each tier is
+        +{Math.round(DMG_PER_TIER * 100)}% damage against THAT monster.
       </Text>
 
       {zones.map((z) => (
@@ -30,16 +33,16 @@ export default function KnowledgeScreen({ onBack }) {
           <Text style={styles.zoneName}>{z.name}</Text>
           {z.monsters.map((m) => {
             const cores = k[m.id] || 0;
-            const isStudied = cores >= CORE_STUDY_THRESHOLD;
+            const tier = knowledgeTier(cores);
             const found = cores > 0;
             return (
               <View key={m.id} style={styles.row}>
                 <Text style={[styles.mName, !found && styles.unknown]}>
                   {found ? m.name : "???"}
-                  {isStudied ? <Text style={styles.studied}>  ✦ studied</Text> : null}
+                  {tier > 0 ? <Text style={styles.studied}>  ✦ T{tier} · +{Math.round(tier * DMG_PER_TIER * 100)}%</Text> : null}
                   {m.kind !== "normal" ? <Text style={styles.kind}>  · {m.kind}</Text> : null}
                 </Text>
-                <Text style={styles.cores}>{cores}/{CORE_STUDY_THRESHOLD}</Text>
+                <Text style={styles.cores}>{cores}/{nextTierAt(cores)}</Text>
               </View>
             );
           })}

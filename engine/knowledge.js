@@ -11,19 +11,34 @@ import { ENEMIES } from "./enemies.js";
 import { ZONES, zoneForFloor } from "./zones.js";
 import { floorType } from "./floors.js";
 
-export const CORE_STUDY_THRESHOLD = 10; // cores to fully "study" a monster
+// Knowledge tiers: tier 1 at 12 cores, tier 2 at 24, tier 3 at 36, … Each tier
+// grants bonus damage AGAINST that specific monster.
+export const CORE_TIER_SIZE = 12;
+export const DMG_PER_TIER = 0.05; // +5% damage vs that monster per tier
 export const COMBAT_CORE_CHANCE = 0.12; // per monster type, per cleared floor
 export const IDLE_CAP_MS = 8 * 60 * 60 * 1000; // offline idle accrues up to 8h
 
 export function discoveredCount(knowledge = {}) {
   return Object.values(knowledge).filter((n) => n > 0).length;
 }
-export function studiedCount(knowledge = {}) {
-  return Object.values(knowledge).filter((n) => n >= CORE_STUDY_THRESHOLD).length;
+export function knowledgeTier(cores = 0) {
+  return Math.floor(cores / CORE_TIER_SIZE);
 }
-// Studied monsters grant +N to every stat (one per 5 studied).
-export function knowledgeStatBonus(knowledge = {}) {
-  return Math.floor(studiedCount(knowledge) / 5);
+export function tieredCount(knowledge = {}) {
+  return Object.values(knowledge).filter((n) => knowledgeTier(n) > 0).length;
+}
+// Cores needed to reach the next tier (for UI progress).
+export function nextTierAt(cores = 0) {
+  return (knowledgeTier(cores) + 1) * CORE_TIER_SIZE;
+}
+// Per-monster bonus-damage map used in combat: { enemyId: fraction }.
+export function knowledgeDamage(knowledge = {}) {
+  const out = {};
+  for (const [id, c] of Object.entries(knowledge)) {
+    const t = knowledgeTier(c);
+    if (t > 0) out[id] = t * DMG_PER_TIER;
+  }
+  return out;
 }
 
 // Monster ids that appear on a floor (its zone pool + the floor's elite/boss).
