@@ -7,6 +7,7 @@ import { BASE_CLASSES, startingStatsFor } from "../../engine/classes.js";
 import { derive } from "../../engine/stats.js";
 import { effectiveStats, treeFor, maxLevelFor, rankLevelReq } from "../../engine/classTree.js";
 import { getJob, jobsFor, JOB_LEVEL } from "../../engine/jobs.js";
+import { equipmentMods, SLOTS } from "../../engine/items.js";
 import {
   gainExp as engineGainExp,
   stepsToXP,
@@ -41,6 +42,8 @@ export function createProfile(classId) {
     passives: [],
     skillLevels: {}, // id -> rank, for learned tree skills/passives
     job: null, // awakened advanced job id (see engine/jobs.js)
+    inventory: [], // unequipped items
+    equipment: { weapon: null, armor: null, accessory: null },
     energy: BASE_ENERGY,
     gold: 0,
     // Deepest floor not yet cleared — the dungeon's "current floor".
@@ -59,11 +62,13 @@ export function statsWithPassives(profile) {
   return effectiveStats(profile.stats, profile.passives || [], profile.skillLevels || {});
 }
 
-// The full combat stat block: passives + the awakened job's perk.
+// The full combat stat block: passives + the awakened job's perk + equipment.
 export function combatStats(profile) {
   const s = statsWithPassives(profile);
   const job = getJob(profile.job);
   if (job) for (const [k, v] of Object.entries(job.mods || {})) s[k] = (s[k] || 0) + v;
+  const eq = equipmentMods(profile.equipment || {});
+  for (const [k, v] of Object.entries(eq)) s[k] = (s[k] || 0) + v;
   return s;
 }
 
@@ -201,7 +206,44 @@ export function applyFloorResult(profile, result) {
   // Only a full clear pushes you deeper; defeat/flee keep you on this floor.
   if (result.outcome === "cleared") p.floor = (p.floor || 1) + 1;
 
+  // Loot drops go straight into the inventory.
+  if (result.loot && result.loot.length) {
+    p.inventory = [...(p.inventory || []), ...result.loot];
+  }
+
   return { profile: p, levelsGained };
+}
+
+// Equip an item from the inventory; any item already in that slot returns to
+// the inventory. Returns a new profile.
+export function equipItem(profile, itemId) {
+  const inv = profile.inventory || [];
+  const item = inv.find((i) => i.id === itemId);
+  if (!item) return profile;
+  const equipment = { ...(profile.equipment || { weapon: null, armor: null, accessory: null }) };
+  const prev = equipment[item.slot];
+  const newInv = inv.filter((i) => i.id !== itemId);
+  if (prev) newInv.push(prev);
+  equipment[item.slot] = item;
+  return { ...profile, inventory: newInv, equipment };
+}
+
+// Unequip the item in a slot back into the inventory.
+export function unequipItem(profile, slot) {
+  const equipment = { ...(profile.equipment || {}) };
+  const it = equipment[slot];
+  if (!it) return profile;
+  equipment[slot] = null;
+  return { ...profile, inventory: [...(profile.inventory || []), it], equipment };
+}
+
+// Sell an inventory item for gold (value scales with item level + rarity).
+export function sellItem(profile, itemId) {
+  const inv = profile.inventory || [];
+  const item = inv.find((i) => i.id === itemId);
+  if (!item) return profile;
+  const value = Math.max(1, Math.round((item.level || 1) * 2 + Object.values(item.mods || {}).reduce((a, b) => a + b, 0)));
+  return { ...profile, inventory: inv.filter((i) => i.id !== itemId), gold: (profile.gold || 0) + value };
 }
 
 // Regenerate Energy from elapsed real time (+1 per ENERGY_REGEN_MS), up to the

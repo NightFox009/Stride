@@ -19,6 +19,9 @@ import {
   learnSkill,
   awakenJob,
   applyFloorResult,
+  equipItem,
+  unequipItem,
+  sellItem,
   deriveSheet,
   combatStats,
   primaryStatOf,
@@ -110,6 +113,16 @@ export function StrideProvider({ children }) {
     setProfile((p) => (p ? awakenJob(p, jobId) : p));
   }, []);
 
+  const equip = useCallback((itemId) => {
+    setProfile((p) => (p ? equipItem(p, itemId) : p));
+  }, []);
+  const unequip = useCallback((slot) => {
+    setProfile((p) => (p ? unequipItem(p, slot) : p));
+  }, []);
+  const sell = useCallback((itemId) => {
+    setProfile((p) => (p ? sellItem(p, itemId) : p));
+  }, []);
+
   // Start an interactive dungeon floor. Returns a session controller (see
   // engine/dungeonSession.js) the screen drives turn by turn, or null if there
   // isn't enough Energy. Rewards are applied later via commitFloorResult.
@@ -154,6 +167,9 @@ export function StrideProvider({ children }) {
     allocateStats,
     learn,
     awaken,
+    equip,
+    unequip,
+    sell,
     beginFloorSession,
     commitFloorResult,
     floorCost: profile ? energyCost(profile.floor || 1) : 0,

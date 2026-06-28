@@ -8,6 +8,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { useStride } from "../state/StrideContext.js";
 import { floorType } from "../../engine/floors.js";
 import { zoneName } from "../../engine/zones.js";
+import { RARITIES } from "../../engine/items.js";
 import ProgressBar from "../components/ProgressBar.js";
 import { colors, spacing } from "../theme.js";
 
@@ -166,6 +167,16 @@ export default function DungeonScreen({ onBack }) {
           {levelsGained.length > 0 && (
             <Text style={styles.levelUp}>★ Level up → {levelsGained[levelsGained.length - 1].level}!</Text>
           )}
+          {r.loot && r.loot.length > 0 && (
+            <View style={styles.loot}>
+              <Text style={styles.lootTitle}>Loot dropped!</Text>
+              {r.loot.map((it) => (
+                <Text key={it.id} style={[styles.lootItem, { color: RARITIES[it.rarity]?.color }]}>
+                  {it.name} — {Object.entries(it.mods).map(([s, v]) => `+${v} ${s}`).join(", ")}
+                </Text>
+              ))}
+            </View>
+          )}
           <Pressable onPress={leave} style={({ pressed }) => [styles.descend, pressed && styles.pressed, { backgroundColor: colors.accent, marginTop: spacing(2) }]}>
             <Text style={[styles.descendText, { color: colors.bg }]}>Return</Text>
           </Pressable>
@@ -312,6 +323,9 @@ const styles = StyleSheet.create({
   outcome: { fontSize: 20, fontWeight: "800" },
   rewardLine: { color: colors.textDim, fontSize: 14, marginTop: spacing(0.5) },
   levelUp: { color: colors.gold, fontSize: 14, fontWeight: "700", marginTop: spacing(0.5) },
+  loot: { marginTop: spacing(1.5), borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing(1) },
+  lootTitle: { color: colors.text, fontSize: 14, fontWeight: "800", marginBottom: spacing(0.5) },
+  lootItem: { fontSize: 13, fontWeight: "700", lineHeight: 19 },
   sectionTitle: { color: colors.textDim, fontSize: 12, fontWeight: "700", marginBottom: spacing(1), textTransform: "uppercase" },
   enemyRow: {
     flexDirection: "row", alignItems: "center", paddingVertical: spacing(0.75),

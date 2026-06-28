@@ -8,6 +8,7 @@ import { buildWaves, energyCost } from "./floors.js";
 import { derive } from "./stats.js";
 import { SKILLS } from "./skills.js";
 import { TUNING, levelHpBonus } from "./progression.js";
+import { rollLoot } from "./items.js";
 import { createRng } from "./rng.js";
 
 // Same small between-wave recovery as the auto runner.
@@ -37,7 +38,9 @@ export function createFloorSession({ floor, stats, skills, skillLevels = {}, pri
   let totalXp = 0, totalGold = 0, wavesCleared = 0;
 
   function finishFloor(outcome, xp, gold) {
-    result = { outcome, xp, gold, energySpent: cost, wavesCleared, floor };
+    // Loot only drops on a clear; magic find uses the player's Luck.
+    const loot = outcome === "cleared" ? rollLoot(type, floor, stats.LUK || 0, rng) : [];
+    result = { outcome, xp, gold, energySpent: cost, wavesCleared, floor, loot };
     phase = outcome === "cleared" ? "won" : outcome === "defeat" ? "lost" : "fled";
   }
 

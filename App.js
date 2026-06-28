@@ -14,6 +14,7 @@ import HomeScreen from "./src/screens/HomeScreen.js";
 import StatsScreen from "./src/screens/StatsScreen.js";
 import SkillsScreen from "./src/screens/SkillsScreen.js";
 import JobsScreen from "./src/screens/JobsScreen.js";
+import InventoryScreen from "./src/screens/InventoryScreen.js";
 import DungeonScreen from "./src/screens/DungeonScreen.js";
 import { colors } from "./src/theme.js";
 
@@ -42,11 +43,13 @@ function Root() {
     );
   if (screen === "skills") return <SkillsScreen onBack={() => setScreen("stats")} />;
   if (screen === "jobs") return <JobsScreen onBack={() => setScreen("stats")} />;
+  if (screen === "inventory") return <InventoryScreen onBack={() => setScreen("home")} />;
   if (screen === "dungeon") return <DungeonScreen onBack={() => setScreen("home")} />;
   return (
     <HomeScreen
       onOpenStats={() => setScreen("stats")}
       onOpenDungeon={() => setScreen("dungeon")}
+      onOpenInventory={() => setScreen("inventory")}
     />
   );
 }
