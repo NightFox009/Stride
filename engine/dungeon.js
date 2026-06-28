@@ -5,13 +5,13 @@
 import { makeCombatant, runBattle } from "./combat.js";
 import { buildWaves, energyCost } from "./floors.js";
 import { derive } from "./stats.js";
-import { TUNING } from "./progression.js";
+import { TUNING, levelHpBonus } from "./progression.js";
 
 // Small recovery granted between waves so a 10-wave floor is survivable but
 // still attritional. Tunable.
 function betweenWaveRecovery(player) {
-  const hp = Math.round(player.maxHP * 0.05) + derive.hpRegenPerFloor(player.stats);
-  const mp = Math.round(player.maxMP * 0.15);
+  const hp = Math.round(player.maxHP * 0.18) + derive.hpRegenPerFloor(player.stats);
+  const mp = Math.round(player.maxMP * 0.30);
   player.hp = Math.min(player.maxHP, player.hp + hp);
   player.mp = Math.min(player.maxMP, player.mp + mp);
   return { hp, mp };
@@ -19,7 +19,7 @@ function betweenWaveRecovery(player) {
 
 // player: a profile-like { stats, skills } (we build the live combatant here).
 // Returns { outcome, events, wavesCleared, xp, gold, energySpent, player }.
-export function runFloor({ floor, stats, skills, choose, rng, energy }) {
+export function runFloor({ floor, stats, skills, choose, rng, energy, level = 1 }) {
   const events = [];
   const emit = (e) => { events.push(e); return e; };
 
@@ -32,7 +32,7 @@ export function runFloor({ floor, stats, skills, choose, rng, energy }) {
   const { type, waves } = buildWaves(floor, rng);
   emit({ type: "floorStart", floor, floorType: type, waves: waves.length, energyCost: cost });
 
-  const player = makeCombatant({ name: "You", stats, skills, isPlayer: true });
+  const player = makeCombatant({ name: "You", stats, skills, isPlayer: true, bonusHP: levelHpBonus(level) });
 
   // ── Non-combat floors ────────────────────────────────────────
   if (type === "treasure") {
@@ -54,7 +54,7 @@ export function runFloor({ floor, stats, skills, choose, rng, energy }) {
     emit({ type: "waveStart", floor, wave: w + 1, of: waves.length });
 
     const enemyCombatants = waves[w].map((d) => {
-      const c = makeCombatant({ name: d.name, stats: d.stats });
+      const c = makeCombatant({ name: d.name, stats: d.stats, hp: d.hp });
       c.xp = d.xp; c.gold = d.gold;
       return c;
     });

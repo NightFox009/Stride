@@ -7,14 +7,15 @@ import { SKILLS } from "./skills.js";
 import { createRng } from "./rng.js";
 
 // Build a live combatant from a stat block.
-export function makeCombatant({ name, stats, skills = [], isPlayer = false }) {
+export function makeCombatant({ name, stats, skills = [], isPlayer = false, hp = null, bonusHP = 0 }) {
+  const maxHP = (hp != null ? hp : derive.maxHP(stats)) + bonusHP;
   return {
     name,
     stats,
     isPlayer,
     skills,
-    hp: derive.maxHP(stats),
-    maxHP: derive.maxHP(stats),
+    hp: maxHP,
+    maxHP,
     mp: derive.maxMP(stats),
     maxMP: derive.maxMP(stats),
     guard: false,

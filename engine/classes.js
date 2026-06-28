@@ -5,11 +5,11 @@ import { makeStats } from "./stats.js";
 // Each base class: all stats 5, +1 to its signature stat (= 6), plus a skill.
 export const BASE_CLASSES = {
   knight:   { id: "knight",   name: "Knight",   boost: "STR", skills: ["shield_bash"] },
-  sentinel: { id: "sentinel", name: "Sentinel", boost: "VIT", skills: ["bulwark"] },
+  sentinel: { id: "sentinel", name: "Sentinel", boost: "VIT", skills: ["aegis_strike"] },
   monk:     { id: "monk",     name: "Monk",     boost: "END", skills: ["flurry"] },
   ranger:   { id: "ranger",   name: "Ranger",   boost: "AGI", skills: ["quick_shot"] },
   scholar:  { id: "scholar",  name: "Scholar",  boost: "INT", skills: ["arcane_bolt"] },
-  herald:   { id: "herald",   name: "Herald",   boost: "CHA", skills: ["rally"] },
+  herald:   { id: "herald",   name: "Herald",   boost: "CHA", skills: ["cutting_words", "rally"] },
   wanderer: { id: "wanderer", name: "Wanderer", boost: "LUK", skills: ["wild_gamble"] },
 };
 

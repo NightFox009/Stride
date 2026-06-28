@@ -22,9 +22,9 @@ export function makeStats(overrides = {}) {
 
 // Derived stats — all combat numbers flow from here.
 export const derive = {
-  maxHP: (s) => 50 + s.END * 8 + s.VIT * 5,
+  maxHP: (s) => 30 + s.END * 6 + s.VIT * 4,
   maxMP: (s) => 20 + s.INT * 5,
-  attack: (s) => s.STR * 2,
+  attack: (s) => s.STR * 3,
   skillPower: (s) => s.INT * 2,
   critChance: (s) => clamp(5 + s.LUK * 0.5, 0, 75), // %
   critMult: () => 1.75,

@@ -30,13 +30,18 @@ sim.js            text demo that drives the engine end to end
 ## Try it
 
 ```bash
-node sim.js          # default seed
+node sim.js          # default seed — plays a full floor end to end
 node sim.js 7        # any seed -> reproducible run
+node balance.js      # simulate many runs, print clear rates per level/floor
+node balance.js 500  # more trials = steadier numbers
 ```
 
-You'll see: steps converted to EXP/Energy, level-ups, the avatar sheet, a
-turn-based dungeon wave, loot at the reduced dungeon EXP rate, and a hidden-class
-unlock check.
+`sim.js` shows: steps converted to EXP/Energy, level-ups, the avatar sheet, a
+full 10-wave dungeon floor, loot at the reduced dungeon EXP rate, and a
+hidden-class unlock check.
+
+`balance.js` is the tuning harness — it runs each class/level/floor combo many
+times and reports clear rates so balance is driven by data, not guesswork.
 
 ## Next
 

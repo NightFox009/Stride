@@ -1,128 +1,96 @@
 // Starter skill set. Each skill is pure data + a small effect function.
 // effect(ctx) -> returns an array of event objects describing what happened.
 //
-// ctx = { user, targets, rng, log }
-//   user.combat   = live combat state (hp, mp, ...)
-//   targets[]     = enemy combat states
+// DESIGN PRINCIPLE: every base class's signature skill scales off the SAME stat
+// that class boosts. So investing your stat points into your class stat always
+// increases your power — this is what makes all 7 classes viable.
 //
-// Damage helper lives in combat.js (applyDamage). Skills call it via ctx.
+// ctx = { user, targets, rng, dealDamage, heal }
 
 export const SKILLS = {
   // ── Knight (STR) ─────────────────────────────────────────────
   shield_bash: {
-    id: "shield_bash",
-    name: "Shield Bash",
-    cost: 6,
-    target: "single",
+    id: "shield_bash", name: "Shield Bash", cost: 5, target: "single",
     describe: "Heavy STR strike; may stun.",
     effect: (ctx) => {
       const t = ctx.targets[0];
-      const dmg = ctx.dealDamage(ctx.user, t, ctx.user.stats.STR * 2.6, "physical");
-      const events = [dmg];
-      if (ctx.rng.chance(25)) {
-        t.stunned = true;
-        events.push({ type: "status", target: t.name, status: "stunned" });
-      }
+      const events = [ctx.dealDamage(ctx.user, t, ctx.user.stats.STR * 2.4, "physical")];
+      if (ctx.rng.chance(20)) { t.stunned = true; events.push({ type: "status", target: t.name, status: "stunned" }); }
       return events;
     },
   },
 
-  // ── Sentinel (VIT) ───────────────────────────────────────────
-  bulwark: {
-    id: "bulwark",
-    name: "Bulwark",
-    cost: 5,
-    target: "self",
-    describe: "Raise guard: halve incoming damage next turn.",
+  // ── Sentinel (VIT) — damage + self-guard ─────────────────────
+  aegis_strike: {
+    id: "aegis_strike", name: "Aegis Strike", cost: 5, target: "single",
+    describe: "VIT damage and raise guard (halve next hit).",
     effect: (ctx) => {
       ctx.user.guard = true;
-      return [{ type: "buff", target: ctx.user.name, buff: "guard" }];
+      return [
+        { type: "buff", target: ctx.user.name, buff: "guard" },
+        ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.VIT * 2.2, "physical"),
+      ];
     },
   },
 
-  // ── Monk (END) ───────────────────────────────────────────────
+  // ── Monk (END) — three rapid hits scaling END ────────────────
   flurry: {
-    id: "flurry",
-    name: "Flurry",
-    cost: 7,
-    target: "single",
-    describe: "Three rapid STR hits.",
+    id: "flurry", name: "Flurry", cost: 6, target: "single",
+    describe: "Three rapid END-scaling hits.",
     effect: (ctx) => {
       const t = ctx.targets[0];
       const events = [];
       for (let i = 0; i < 3; i++) {
         if (t.hp <= 0) break;
-        events.push(ctx.dealDamage(ctx.user, t, ctx.user.stats.STR * 1.1, "physical"));
+        events.push(ctx.dealDamage(ctx.user, t, ctx.user.stats.END * 1.0, "physical"));
       }
       return events;
     },
   },
 
-  // ── Ranger (AGI) ─────────────────────────────────────────────
+  // ── Ranger (AGI) — high-crit AGI shot ────────────────────────
   quick_shot: {
-    id: "quick_shot",
-    name: "Quick Shot",
-    cost: 5,
-    target: "single",
+    id: "quick_shot", name: "Quick Shot", cost: 5, target: "single",
     describe: "AGI-scaling shot with high crit.",
-    effect: (ctx) => {
-      const t = ctx.targets[0];
-      return [ctx.dealDamage(ctx.user, t, ctx.user.stats.AGI * 2.2, "physical", { critBonus: 20 })];
-    },
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.AGI * 2.6, "physical", { critBonus: 20 })],
   },
 
-  // ── Scholar (INT) ────────────────────────────────────────────
+  // ── Scholar (INT) — magic bolt ───────────────────────────────
   arcane_bolt: {
-    id: "arcane_bolt",
-    name: "Arcane Bolt",
-    cost: 6,
-    target: "single",
+    id: "arcane_bolt", name: "Arcane Bolt", cost: 6, target: "single",
     describe: "Magic damage scaling with INT.",
-    effect: (ctx) => {
-      const t = ctx.targets[0];
-      return [ctx.dealDamage(ctx.user, t, ctx.user.stats.INT * 2.8, "magic")];
-    },
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.INT * 2.6, "magic")],
   },
 
-  // ── Herald (CHA) ─────────────────────────────────────────────
+  // ── Herald (CHA) — commanding strike ─────────────────────────
+  cutting_words: {
+    id: "cutting_words", name: "Cutting Words", cost: 5, target: "single",
+    describe: "CHA-scaling attack that demoralizes the foe.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.CHA * 2.4, "magic")],
+  },
+
+  // ── Herald secondary — heal ──────────────────────────────────
   rally: {
-    id: "rally",
-    name: "Rally",
-    cost: 6,
-    target: "self",
+    id: "rally", name: "Rally", cost: 6, target: "self",
     describe: "Heal self based on CHA + VIT.",
-    effect: (ctx) => {
-      const amount = Math.round(ctx.user.stats.CHA * 2 + ctx.user.stats.VIT);
-      return [ctx.heal(ctx.user, amount)];
-    },
+    effect: (ctx) => [ctx.heal(ctx.user, Math.round(ctx.user.stats.CHA * 2 + ctx.user.stats.VIT))],
   },
 
-  // ── Wanderer (LUK) ───────────────────────────────────────────
+  // ── Wanderer (LUK) — feast-or-fizzle gamble ──────────────────
   wild_gamble: {
-    id: "wild_gamble",
-    name: "Wild Gamble",
-    cost: 6,
-    target: "single",
+    id: "wild_gamble", name: "Wild Gamble", cost: 5, target: "single",
     describe: "Damage swings wildly with LUK — feast or fizzle.",
     effect: (ctx) => {
-      const t = ctx.targets[0];
-      const roll = ctx.rng.next(); // 0..1
+      const roll = ctx.rng.next();
       const mult = 0.5 + roll * (1.5 + ctx.user.stats.LUK * 0.05);
-      return [ctx.dealDamage(ctx.user, t, ctx.user.stats.STR * 2 * mult, "physical")];
+      return [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.LUK * 2.0 * mult, "physical")];
     },
   },
 
   // ── Hidden: Juggernaut (1000 STR) ────────────────────────────
   earthshatter: {
-    id: "earthshatter",
-    name: "Earthshatter",
-    cost: 14,
-    target: "all",
+    id: "earthshatter", name: "Earthshatter", cost: 12, target: "all",
     describe: "AoE STR damage to every enemy.",
-    effect: (ctx) => {
-      return ctx.targets
-        .filter((t) => t.hp > 0)
-        .map((t) => ctx.dealDamage(ctx.user, t, ctx.user.stats.STR * 1.8, "physical"));
-    },
+    effect: (ctx) => ctx.targets.filter((t) => t.hp > 0).map((t) => ctx.dealDamage(ctx.user, t, ctx.user.stats.STR * 1.8, "physical")),
   },
 };

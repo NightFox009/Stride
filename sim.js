@@ -126,6 +126,7 @@ const floorResult = runFloor({
   choose: policy,
   rng,
   energy: profile.energy,
+  level: profile.level,
 });
 render(floorResult.events);
 hr();

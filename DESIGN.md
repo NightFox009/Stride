@@ -62,16 +62,26 @@ GAME ENGINE (pure logic)  ── emits events ──►  Text UI (v1)
 | Charisma  | CHA | Better loot/shop prices, recruit NPCs, boss negotiation |
 | Luck      | LUK | Crit rate, rare drops, treasure odds, lucky dodges |
 
-### Derived stats (formulas — tune later)
-- `maxHP   = 50 + END*8 + VIT*5`
+### Derived stats (formulas — tuned in the balance pass)
+- `maxHP   = 30 + END*6 + VIT*4  (+ 5 per character level)`
 - `maxMP   = 20 + INT*5`
-- `attack  = STR*2`                  (basic physical power)
+- `attack  = STR*3`                  (basic physical power)
 - `skillPower = INT*2`               (skill scaling base)
 - `critChance = clamp(5 + LUK*0.5, 0, 75)%`
+- `critMult   = 1.75`
 - `dodgeChance = clamp(AGI*0.4, 0, 60)%`
-- `hpRegen = VIT*0.5 per floor cleared`
+- `hpRegen = round(VIT*0.5) per floor cleared`
 - `fleeChance = clamp(30 + AGI*0.5 + LUK*0.3, 5, 95)%`
 - **Turn order** = highest AGI acts first.
+
+> **Class viability rule:** each base class's signature skill scales off the
+> stat that class boosts (Knight→STR, Sentinel→VIT, Monk→END, Ranger→AGI,
+> Scholar→INT, Herald→CHA, Wanderer→LUK). Investing your stat points into your
+> class stat always increases your power — so all 7 classes are viable.
+
+> **Enemy HP is authored per template** (decoupled from the player HP formula)
+> so enemy durability can be balanced independently of player stats. Enemy
+> `stats` still drive their damage, speed, crit, and dodge.
 
 ---
 
@@ -181,8 +191,12 @@ When you lose a run:
 ## 8. Roadmap
 
 1. **Engine v1 (text):** stats, classes, skills, turn-based combat, waves, floors,
-   progression, loot — fully testable in the terminal. ← *we are here*
-2. **Balance pass:** tune formulas, EXP/Energy rates, the 100-floor curve.
+   progression, loot — fully testable in the terminal. ✅ done
+2. **Balance pass:** tune formulas, EXP/Energy rates, the 100-floor curve. ✅ done
+   (driven by `balance.js`, a harness that simulates many runs and reports
+   clear rates). Current curve: Lv3 clears Floor 1 ~75%, Lv5 ~99%; Floor 10
+   boss is a gate (~35% at Lv18, opens up by Lv25); all 7 classes 99–100% on
+   Floor 1 at Lv5.
 3. **React Native app shell:** pedometer/HealthKit/Health Connect integration,
    local SQLite, the core walk→EXP→Energy loop.
 4. **Text UI in-app**, then **graphical UI (v2)** on the same engine.

@@ -8,7 +8,13 @@ export const TUNING = {
   stepsPerXP: 10,     // 10 steps = 1 EXP
   stepsPerEnergy: 100,// 100 steps = 1 Energy
   dungeonXpFactor: 0.5, // dungeon EXP is reduced vs walking
+  hpPerLevel: 5,      // flat HP gained per level (survivability scales w/ level)
 };
+
+// Bonus HP a player has from their level (level 1 = 0 bonus).
+export function levelHpBonus(level) {
+  return (level - 1) * TUNING.hpPerLevel;
+}
 
 export function expToNext(level) {
   return Math.round(TUNING.baseXP * Math.pow(level, 1.5));
