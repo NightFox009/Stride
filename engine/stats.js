@@ -22,20 +22,22 @@ export function makeStats(overrides = {}) {
 
 // Derived stats — all combat numbers flow from here.
 export const derive = {
-  // Every primary stat is "attack + a side effect":
-  //   STR attack + HP   END attack + HP/regen   AGI attack + dodge/speed
-  //   VIT attack + HP    INT attack + MP/power   CHA attack + MP
-  //   LUK attack + crit/flee
-  maxHP: (s) => 30 + s.END * 6 + s.VIT * 4 + s.STR * 2,
-  maxMP: (s) => 20 + s.INT * 5 + s.CHA * 2,
+  // Balanced: every stat gives ATTACK (if it's your primary) + exactly TWO side
+  // effects of comparable value:
+  //   STR → HP  + crit damage      VIT → HP + HP regen
+  //   END → HP  + MP               AGI → dodge + speed
+  //   INT → MP  + skill power      CHA → MP + HP regen
+  //   LUK → crit chance + dodge
+  maxHP: (s) => 30 + s.END * 6 + s.VIT * 5 + s.STR * 3,
+  maxMP: (s) => 20 + s.INT * 5 + s.END * 3 + s.CHA * 3,
   // Basic attack scales off the wielder's PRIMARY stat (the class's signature
   // stat). Defaults to STR for enemies and anything class-agnostic.
   attack: (s, primary = "STR") => (s[primary] || 0) * 3,
   skillPower: (s) => s.INT * 2,
-  critChance: (s) => clamp(5 + s.LUK * 0.5, 0, 75), // %
-  critMult: () => 1.75,
-  dodgeChance: (s) => clamp(s.AGI * 0.4, 0, 60), // %
-  speed: (s) => s.AGI, // turn order
-  hpRegenPerFloor: (s) => Math.round(s.VIT * 0.5),
-  fleeChance: (s) => clamp(30 + s.AGI * 0.5 + s.LUK * 0.3, 5, 95), // %
+  critChance: (s) => clamp(5 + s.LUK * 0.5, 0, 75), // %  (LUK)
+  critMult: (s = {}) => 1.7 + (s.STR || 0) * 0.01, // STR → harder crits
+  dodgeChance: (s) => clamp(s.AGI * 0.4 + s.LUK * 0.2, 0, 60), // %  (AGI, LUK)
+  speed: (s) => s.AGI, // turn order  (AGI)
+  hpRegenPerFloor: (s) => Math.round(s.VIT * 0.5 + s.CHA * 0.4), // (VIT, CHA)
+  fleeChance: (s) => clamp(25 + s.AGI * 0.4, 5, 95), // % — fleeing forfeits, so not a perk
 };
