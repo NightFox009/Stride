@@ -18,6 +18,9 @@ import {
   applyEnergyRegen,
   applyHpRegen,
   vitals,
+  startCamp,
+  claimCamp,
+  stopCamp,
   learnSkill,
   awakenJob,
   applyFloorResult,
@@ -53,7 +56,10 @@ export function StrideProvider({ children }) {
     (async () => {
       const saved = await loadProfile();
       if (!cancelled) {
-        setProfile(saved ? applyHpRegen(applyEnergyRegen(saved)) : saved);
+        let init = saved ? applyHpRegen(applyEnergyRegen(saved)) : saved;
+        // Grant offline idle accrual on return, then keep camping.
+        if (init && init.idle) init = claimCamp(init).profile;
+        setProfile(init);
         setLoading(false);
       }
     })();
@@ -127,6 +133,9 @@ export function StrideProvider({ children }) {
   const sell = useCallback((itemId) => {
     setProfile((p) => (p ? sellItem(p, itemId) : p));
   }, []);
+  const camp = useCallback(() => setProfile((p) => (p ? startCamp(p) : p)), []);
+  const claimIdle = useCallback(() => setProfile((p) => (p ? claimCamp(p).profile : p)), []);
+  const stopIdle = useCallback(() => setProfile((p) => (p ? stopCamp(p).profile : p)), []);
   const upgrade = useCallback((itemId) => {
     setProfile((p) => (p ? upgradeItem(p, itemId) : p));
   }, []);
@@ -189,6 +198,9 @@ export function StrideProvider({ children }) {
     sell,
     upgrade,
     craft,
+    camp,
+    claimIdle,
+    stopIdle,
     beginFloorSession,
     commitFloorResult,
     floorCost: profile ? energyCost(profile.floor || 1) : 0,

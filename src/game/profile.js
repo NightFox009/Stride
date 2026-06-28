@@ -7,7 +7,9 @@ import { BASE_CLASSES, startingStatsFor } from "../../engine/classes.js";
 import { derive } from "../../engine/stats.js";
 import { effectiveStats, treeFor, maxLevelFor, rankLevelReq } from "../../engine/classTree.js";
 import { getJob, jobsFor, JOB_LEVEL, classWeaponTypes } from "../../engine/jobs.js";
+import { STATS } from "../../engine/stats.js";
 import { equipmentMods, SLOTS, CLASS_GEAR } from "../../engine/items.js";
+import { knowledgeStatBonus, idleRewards } from "../../engine/knowledge.js";
 import {
   upgradeCost,
   rarityUpgradeCost,
@@ -54,6 +56,8 @@ export function createProfile(classId) {
     inventory: [], // unequipped items
     equipment: { weapon: null, subweapon: null, helm: null, armor: null, gloves: null, boots: null, accessory: null },
     materials: {}, // crafting materials: { matId: count }
+    knowledge: {}, // bestiary: { enemyId: coreCount }
+    idle: null, // active camp: { floor, since }
     currentHP: null, // carried HP between floors (null = full)
     currentMP: null, // carried MP between floors (null = full)
     lastRestTick: Date.now(), // for time-based HP/MP regen
@@ -82,6 +86,9 @@ export function combatStats(profile) {
   if (job) for (const [k, v] of Object.entries(job.mods || {})) s[k] = (s[k] || 0) + v;
   const eq = equipmentMods(profile.equipment || {});
   for (const [k, v] of Object.entries(eq)) s[k] = (s[k] || 0) + v;
+  // Knowledge: studied monsters grant a small bonus to every stat.
+  const kb = knowledgeStatBonus(profile.knowledge || {});
+  if (kb) for (const st of STATS) s[st] = (s[st] || 0) + kb;
   return s;
 }
 
@@ -229,6 +236,12 @@ export function applyFloorResult(profile, result) {
     for (const [k, q] of Object.entries(result.materials)) m[k] = (m[k] || 0) + q;
     p.materials = m;
   }
+  // Monster cores feed the knowledge book.
+  if (result.cores && Object.keys(result.cores).length) {
+    const k = { ...(p.knowledge || {}) };
+    for (const [id, n] of Object.entries(result.cores)) k[id] = (k[id] || 0) + n;
+    p.knowledge = k;
+  }
 
   // Carry HP/MP to the next floor. Defeat respawns you at full; otherwise keep
   // the HP/MP you ended the floor on (rest floors end you at full).
@@ -242,6 +255,42 @@ export function applyFloorResult(profile, result) {
   p.lastRestTick = Date.now(); // restart the regen clock after a floor
 
   return { profile: p, levelsGained };
+}
+
+// ── Idle / camp ──────────────────────────────────────────────
+// Start camping the current floor (passively earns EXP + cores over time).
+export function startCamp(profile) {
+  return { ...profile, idle: { floor: profile.floor || 1, since: Date.now() } };
+}
+
+// What the active camp has accrued so far (without claiming).
+export function idlePreview(profile, now = Date.now()) {
+  if (!profile.idle) return null;
+  return idleRewards(profile.idle.floor, now - profile.idle.since);
+}
+
+// Claim the camp's accrued rewards and keep camping (resets the clock).
+export function claimCamp(profile, now = Date.now()) {
+  if (!profile.idle) return { profile, rewards: null };
+  const rewards = idleRewards(profile.idle.floor, now - profile.idle.since);
+  let p = { ...profile, idle: { ...profile.idle, since: now } };
+  if (rewards.xp > 0) {
+    const r = engineGainExp(p, rewards.xp);
+    p = r.profile;
+    p.skillPoints = (p.skillPoints || 0) + r.levelsGained.length;
+  }
+  if (Object.keys(rewards.cores).length) {
+    const k = { ...(p.knowledge || {}) };
+    for (const [id, n] of Object.entries(rewards.cores)) k[id] = (k[id] || 0) + n;
+    p.knowledge = k;
+  }
+  return { profile: p, rewards };
+}
+
+// Claim and stop camping.
+export function stopCamp(profile, now = Date.now()) {
+  const { profile: p, rewards } = claimCamp(profile, now);
+  return { profile: { ...p, idle: null }, rewards };
 }
 
 // Find an item by id across inventory and equipped slots.

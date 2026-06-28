@@ -23,7 +23,7 @@ function regenLabel(profile) {
   return `+1⚡ in ~${m} min`;
 }
 
-export default function HomeScreen({ onOpenStats, onOpenDungeon, onOpenInventory }) {
+export default function HomeScreen({ onOpenStats, onOpenDungeon, onOpenInventory, onOpenKnowledge }) {
   const { profile, sheet, vitals, ingestSteps, convert, lastEarned, floorCost } = useStride();
   const { available, error, addManualSteps } = useStepSource(ingestSteps);
 
@@ -160,6 +160,9 @@ export default function HomeScreen({ onOpenStats, onOpenDungeon, onOpenInventory
         <Text style={styles.statsLinkText}>
           Gear & inventory{(profile.inventory?.length || 0) > 0 ? `  ·  ${profile.inventory.length}` : ""} →
         </Text>
+      </Pressable>
+      <Pressable style={styles.statsLink} onPress={onOpenKnowledge}>
+        <Text style={styles.statsLinkText}>Knowledge book →</Text>
       </Pressable>
     </ScrollView>
   );

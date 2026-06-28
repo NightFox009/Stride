@@ -10,6 +10,7 @@ import { floorType } from "../../engine/floors.js";
 import { zoneName } from "../../engine/zones.js";
 import { RARITIES, statLabel } from "../../engine/items.js";
 import { MATERIALS } from "../../engine/crafting.js";
+import { idlePreview } from "../game/profile.js";
 import ProgressBar from "../components/ProgressBar.js";
 import { colors, spacing } from "../theme.js";
 
@@ -57,7 +58,7 @@ const TONE_COLOR = {
 };
 
 export default function DungeonScreen({ onBack }) {
-  const { profile, vitals, floorCost, beginFloorSession, commitFloorResult } = useStride();
+  const { profile, vitals, floorCost, beginFloorSession, commitFloorResult, camp, claimIdle, stopIdle } = useStride();
   const sessionRef = useRef(null);
   const committedRef = useRef(false);
   const [, setTick] = useState(0);
@@ -151,6 +152,39 @@ export default function DungeonScreen({ onBack }) {
             <Text style={styles.note}>
               Need {floorCost}⚡ — walk {Math.max(0, floorCost - profile.energy) * 100} more steps.
             </Text>
+          )}
+        </View>
+
+        {/* Idle / camp — stuck on a floor? Camp it for passive EXP + cores. */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Camp (idle)</Text>
+          {profile.idle ? (
+            (() => {
+              const pv = idlePreview(profile);
+              return (
+                <>
+                  <Text style={styles.blurb}>
+                    Camping Floor {profile.idle.floor} · {pv.minutes} min accrued{pv.capped ? " (max)" : ""}
+                    {"\n"}+{pv.xp} EXP, {Object.values(pv.cores).reduce((a, b) => a + b, 0)} cores waiting
+                  </Text>
+                  <View style={styles.campRow}>
+                    <Pressable onPress={claimIdle} style={[styles.campBtn, { backgroundColor: colors.accent }]}>
+                      <Text style={[styles.campBtnText, { color: colors.bg }]}>Claim</Text>
+                    </Pressable>
+                    <Pressable onPress={stopIdle} style={styles.campBtn}>
+                      <Text style={styles.campBtnText}>Stop</Text>
+                    </Pressable>
+                  </View>
+                </>
+              );
+            })()
+          ) : (
+            <>
+              <Text style={styles.blurb}>Stuck? Camp this floor to passively earn EXP and monster cores over time (up to 8h offline).</Text>
+              <Pressable onPress={camp} style={[styles.campBtn, { backgroundColor: colors.exp, marginTop: spacing(1.5) }]}>
+                <Text style={[styles.campBtnText, { color: colors.bg }]}>Camp Floor {floor}</Text>
+              </Pressable>
+            </>
           )}
         </View>
       </ScrollView>
@@ -339,6 +373,9 @@ const styles = StyleSheet.create({
   lootItem: { fontSize: 13, fontWeight: "700", lineHeight: 19 },
   mats: { color: colors.textDim, fontSize: 12, marginTop: spacing(0.5) },
   sectionTitle: { color: colors.textDim, fontSize: 12, fontWeight: "700", marginBottom: spacing(1), textTransform: "uppercase" },
+  campRow: { flexDirection: "row", gap: spacing(1), marginTop: spacing(1.5) },
+  campBtn: { flex: 1, alignItems: "center", paddingVertical: spacing(1.25), borderRadius: 10, backgroundColor: colors.surfaceAlt },
+  campBtnText: { color: colors.text, fontWeight: "800", fontSize: 14 },
   enemyRow: {
     flexDirection: "row", alignItems: "center", paddingVertical: spacing(0.75),
     paddingHorizontal: spacing(1), borderRadius: 8, borderWidth: 1, borderColor: "transparent", marginBottom: 4,
