@@ -22,8 +22,12 @@ export function makeStats(overrides = {}) {
 
 // Derived stats — all combat numbers flow from here.
 export const derive = {
-  maxHP: (s) => 30 + s.END * 6 + s.VIT * 4,
-  maxMP: (s) => 20 + s.INT * 5,
+  // Every primary stat is "attack + a side effect":
+  //   STR attack + HP   END attack + HP/regen   AGI attack + dodge/speed
+  //   VIT attack + HP    INT attack + MP/power   CHA attack + MP
+  //   LUK attack + crit/flee
+  maxHP: (s) => 30 + s.END * 6 + s.VIT * 4 + s.STR * 2,
+  maxMP: (s) => 20 + s.INT * 5 + s.CHA * 2,
   // Basic attack scales off the wielder's PRIMARY stat (the class's signature
   // stat). Defaults to STR for enemies and anything class-agnostic.
   attack: (s, primary = "STR") => (s[primary] || 0) * 3,
