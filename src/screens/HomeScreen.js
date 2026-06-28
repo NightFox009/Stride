@@ -10,6 +10,7 @@ import { unlockedHiddenClasses } from "../../engine/classes.js";
 import ProgressBar from "../components/ProgressBar.js";
 import Avatar, { evolutionStage, STAGE_TITLES } from "../components/Avatar.js";
 import { conversionPreview, msToNextEnergy, MAX_ENERGY } from "../game/profile.js";
+import { getJob } from "../../engine/jobs.js";
 import { colors, spacing } from "../theme.js";
 
 const STAGE_THRESHOLDS = [10, 20, 30, 50];
@@ -28,16 +29,20 @@ export default function HomeScreen({ onOpenStats, onOpenDungeon }) {
 
   const hidden = unlockedHiddenClasses(profile.stats);
   const preview = conversionPreview(profile);
+  const jobName = getJob(profile.job)?.name;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       {/* Avatar / identity */}
       <View style={[styles.card, styles.identityCard]}>
         <View style={styles.avatar}>
-          <Avatar classId={profile.classId} level={profile.level} size={76} />
+          <Avatar classId={profile.classId} level={profile.level} job={profile.job} size={76} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.className}>{profile.className}</Text>
+          <Text style={styles.className}>
+            {profile.className}
+            {jobName ? <Text style={styles.jobName}>  ·  {jobName}</Text> : null}
+          </Text>
           <Text style={styles.level}>Level {profile.level}</Text>
           <Text style={styles.stage}>
             ✦ {STAGE_TITLES[evolutionStage(profile.level)]}
@@ -181,6 +186,7 @@ const styles = StyleSheet.create({
     marginRight: spacing(2),
   },
   className: { color: colors.text, fontSize: 20, fontWeight: "800" },
+  jobName: { color: colors.gold, fontSize: 14, fontWeight: "700" },
   level: { color: colors.textDim, fontSize: 14, marginTop: 2 },
   stage: { color: colors.gold, fontSize: 12, fontWeight: "700", marginTop: 3 },
   stageNext: { color: colors.textDim, fontWeight: "500" },

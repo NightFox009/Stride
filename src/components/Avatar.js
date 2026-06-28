@@ -11,6 +11,7 @@
 import React from "react";
 import Svg, { Circle, Path, Polygon, Line, G } from "react-native-svg";
 import { BASE_CLASSES } from "../../engine/classes.js";
+import { getJob } from "../../engine/jobs.js";
 import { colors, STAT_COLORS } from "../theme.js";
 
 export const STAGE_TITLES = ["Novice", "Adept", "Veteran", "Champion", "Ascended"];
@@ -35,6 +36,22 @@ function Emblem({ stat, color }) {
     case "INT": return <Circle cx="50" cy="58" r="6.5" fill={color} />;
     case "CHA": return <Polygon points="50,51 52,56 57,56 53,60 55,65 50,62 45,65 47,60 43,56 48,56" fill={color} />;
     case "LUK": return <Path d="M50 50 L53 57 L60 58 L53 59 L50 66 L47 59 L40 58 L47 57 Z" fill={color} />;
+    default: return <Circle cx="50" cy="58" r="6" fill={color} />;
+  }
+}
+
+// Job emblems, drawn on the chest once a job is awakened.
+function JobEmblem({ kind, color }) {
+  switch (kind) {
+    case "blade": return <Path d="M50 50 L53 54 L51 66 L49 66 L47 54 Z" fill={color} />;
+    case "tower": return <Path d="M50 50 L57 53 L57 60 Q57 66 50 68 Q43 66 43 60 L43 53 Z" fill={color} />;
+    case "fist": return <Path d="M45 54 H55 V62 Q50 66 45 62 Z" fill={color} />;
+    case "wing": return <Path d="M50 52 Q42 54 44 62 Q49 58 50 64 Q51 58 56 62 Q58 54 50 52 Z" fill={color} />;
+    case "arrow": return <Polygon points="50,50 54,58 51,58 51,66 49,66 49,58 46,58" fill={color} />;
+    case "eye": return <Path d="M43 58 Q50 51 57 58 Q50 65 43 58 Z" fill={color} />;
+    case "flame": return <Path d="M50 50 Q55 56 52 60 Q56 60 54 65 Q50 68 46 65 Q44 60 48 60 Q45 56 50 50 Z" fill={color} />;
+    case "crown": return <Polygon points="44,64 44,55 47,59 50,53 53,59 56,55 56,64" fill={color} />;
+    case "coin": return <Circle cx="50" cy="58" r="6.5" fill={color} stroke={colors.bg} strokeWidth="1" />;
     default: return <Circle cx="50" cy="58" r="6" fill={color} />;
   }
 }
@@ -88,10 +105,12 @@ function Weapon({ classId, color }) {
   }
 }
 
-export default function Avatar({ classId, level = 1, size = 96 }) {
+export default function Avatar({ classId, level = 1, job = null, size = 96 }) {
   const cls = BASE_CLASSES[classId];
   const stat = cls?.boost ?? "STR";
-  const accent = STAT_COLORS[stat] ?? colors.accent;
+  const jobDef = getJob(job);
+  // An awakened job recolors the figure and swaps in its emblem.
+  const accent = jobDef ? jobDef.color : STAT_COLORS[stat] ?? colors.accent;
   const stage = evolutionStage(level);
 
   const auraOpacity = [0.1, 0.14, 0.18, 0.24, 0.32][stage];
@@ -99,9 +118,10 @@ export default function Avatar({ classId, level = 1, size = 96 }) {
 
   return (
     <Svg width={size} height={size} viewBox="0 0 100 100">
-      {/* aura */}
+      {/* aura — a second ring marks an awakened job */}
       <Circle cx="50" cy="52" r="46" fill={accent} opacity={auraOpacity} />
       <Circle cx="50" cy="52" r="46" fill="none" stroke={accent} strokeWidth={ringWidth} opacity={0.85} />
+      {jobDef && <Circle cx="50" cy="52" r="41" fill="none" stroke={accent} strokeWidth="1" opacity={0.5} />}
 
       {/* Stage 4: wings + halo */}
       {stage >= 4 && (
@@ -146,8 +166,8 @@ export default function Avatar({ classId, level = 1, size = 96 }) {
         <Polygon points="40,22 43,15 47,20 50,13 53,20 57,15 60,22" fill={accent} stroke={colors.bg} strokeWidth="0.5" />
       )}
 
-      {/* class emblem */}
-      <Emblem stat={stat} color={accent} />
+      {/* emblem — job emblem once awakened, otherwise the class/stat emblem */}
+      {jobDef ? <JobEmblem kind={jobDef.emblem} color={accent} /> : <Emblem stat={stat} color={accent} />}
     </Svg>
   );
 }

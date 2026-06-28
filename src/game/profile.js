@@ -6,6 +6,7 @@
 import { BASE_CLASSES, startingStatsFor } from "../../engine/classes.js";
 import { derive } from "../../engine/stats.js";
 import { effectiveStats, treeFor, maxLevelFor } from "../../engine/classTree.js";
+import { getJob, jobsFor, meetsJobReq } from "../../engine/jobs.js";
 import {
   gainExp as engineGainExp,
   stepsToXP,
@@ -39,6 +40,7 @@ export function createProfile(classId) {
     skills: [...cls.skills],
     passives: [],
     skillLevels: {}, // id -> rank, for learned tree skills/passives
+    job: null, // awakened advanced job id (see engine/jobs.js)
     energy: BASE_ENERGY,
     gold: 0,
     // Deepest floor not yet cleared — the dungeon's "current floor".
@@ -51,16 +53,42 @@ export function createProfile(classId) {
   };
 }
 
-// The stat block actually used in combat: base allocation + passive bonuses
-// (scaled by each passive's level).
+// Base allocation + passive bonuses (scaled by passive level). This is also the
+// stat block used to check job requirements (the job's own perk doesn't count).
 export function statsWithPassives(profile) {
   return effectiveStats(profile.stats, profile.passives || [], profile.skillLevels || {});
 }
 
-// Derived, never-persisted view used by the UI (HP/MP/attack/etc.). Uses the
-// effective stats so passives are reflected in the combat sheet.
-export function deriveSheet(profile) {
+// The full combat stat block: passives + the awakened job's perk.
+export function combatStats(profile) {
   const s = statsWithPassives(profile);
+  const job = getJob(profile.job);
+  if (job) for (const [k, v] of Object.entries(job.mods || {})) s[k] = (s[k] || 0) + v;
+  return s;
+}
+
+// Which of the class's jobs the character currently qualifies for.
+export function jobOptions(profile) {
+  const stats = statsWithPassives(profile);
+  return jobsFor(profile.classId).map((job) => ({
+    ...job,
+    qualifies: meetsJobReq(job, profile.level, stats),
+    active: profile.job === job.id,
+  }));
+}
+
+// Awaken (or switch to) a job the character qualifies for.
+export function awakenJob(profile, jobId) {
+  const job = getJob(jobId);
+  if (!job || job.classId !== profile.classId) return profile;
+  if (!meetsJobReq(job, profile.level, statsWithPassives(profile))) return profile;
+  return { ...profile, job: jobId };
+}
+
+// Derived, never-persisted view used by the UI (HP/MP/attack/etc.). Uses the
+// full combat stats so passives AND the job perk are reflected.
+export function deriveSheet(profile) {
+  const s = combatStats(profile);
   return {
     maxHP: derive.maxHP(s) + levelHpBonus(profile.level),
     maxMP: derive.maxMP(s),

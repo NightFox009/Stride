@@ -17,9 +17,10 @@ import {
   applyAllocation,
   applyEnergyRegen,
   learnSkill,
+  awakenJob,
   applyFloorResult,
   deriveSheet,
-  statsWithPassives,
+  combatStats,
 } from "../game/profile.js";
 import { createFloorSession } from "../../engine/dungeonSession.js";
 import { energyCost } from "../../engine/floors.js";
@@ -104,6 +105,10 @@ export function StrideProvider({ children }) {
     setProfile((p) => (p ? learnSkill(p, entryId) : p));
   }, []);
 
+  const awaken = useCallback((jobId) => {
+    setProfile((p) => (p ? awakenJob(p, jobId) : p));
+  }, []);
+
   // Start an interactive dungeon floor. Returns a session controller (see
   // engine/dungeonSession.js) the screen drives turn by turn, or null if there
   // isn't enough Energy. Rewards are applied later via commitFloorResult.
@@ -117,7 +122,7 @@ export function StrideProvider({ children }) {
     if (p.energy < energyCost(floor)) return null;
     return createFloorSession({
       floor,
-      stats: statsWithPassives(p), // base allocation + passive bonuses
+      stats: combatStats(p), // base + passives + job perk
       skills: p.skills,
       skillLevels: p.skillLevels || {},
       level: p.level,
@@ -146,6 +151,7 @@ export function StrideProvider({ children }) {
     convert,
     allocateStats,
     learn,
+    awaken,
     beginFloorSession,
     commitFloorResult,
     floorCost: profile ? energyCost(profile.floor || 1) : 0,

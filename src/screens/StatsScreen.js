@@ -13,7 +13,7 @@ import { colors, spacing, STAT_COLORS } from "../theme.js";
 
 const emptyDraft = () => STATS.reduce((o, s) => ((o[s] = 0), o), {});
 
-export default function StatsScreen({ onBack, onOpenSkills }) {
+export default function StatsScreen({ onBack, onOpenSkills, onOpenJobs }) {
   const { profile, sheet, allocateStats, resetGame } = useStride();
   const [draft, setDraft] = useState(emptyDraft);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -123,6 +123,12 @@ export default function StatsScreen({ onBack, onOpenSkills }) {
         </Text>
       </Pressable>
 
+      <Pressable onPress={onOpenJobs} style={[styles.skillsLink, styles.jobsLink]}>
+        <Text style={[styles.skillsLinkText, { color: colors.gold }]}>
+          Jobs{profile.job ? "  ·  awakened" : ""} →
+        </Text>
+      </Pressable>
+
       <Text style={styles.sectionTitle}>Combat sheet</Text>
       <View style={styles.card}>
         <Derived k="Max HP" v={sheet.maxHP} />
@@ -200,6 +206,7 @@ const styles = StyleSheet.create({
     borderRadius: 12, padding: spacing(1.75), alignItems: "center", marginBottom: spacing(2),
   },
   skillsLinkText: { color: colors.exp, fontSize: 15, fontWeight: "800" },
+  jobsLink: { borderColor: colors.gold },
   sectionTitle: { color: colors.text, fontSize: 16, fontWeight: "700", marginBottom: spacing(1) },
   derivedRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: spacing(0.75) },
   derivedKey: { color: colors.textDim, fontSize: 14 },
