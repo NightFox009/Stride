@@ -63,9 +63,10 @@ export function createFloorSession({ floor, stats, skills, level = 1, rng = crea
       return;
     }
     if (out === "fled") {
+      // Fleeing is a loss: you abandon the run — loot lost, EXP halved.
       const kept = Math.floor(totalXp * 0.5);
       emit({ type: "floorFled", floor, wave: waveIndex + 1, keptXp: kept });
-      finishFloor("fled", kept, totalGold);
+      finishFloor("fled", kept, 0);
       return;
     }
     // victory

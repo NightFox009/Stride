@@ -3,6 +3,15 @@
 // because it's added to the effective stat block before combat math runs.
 
 export const PASSIVES = {
+  // Lv1 minor passives — an early skill-point sink, +3 to the class stat.
+  brute_force:  { id: "brute_force",  name: "Brute Force",   describe: "+3 Strength",  mods: { STR: 3 } },
+  hardy:        { id: "hardy",        name: "Hardy",         describe: "+3 Vitality",  mods: { VIT: 3 } },
+  toughened:    { id: "toughened",    name: "Toughened",     describe: "+3 Endurance", mods: { END: 3 } },
+  nimble:       { id: "nimble",       name: "Nimble",        describe: "+3 Agility",   mods: { AGI: 3 } },
+  focused:      { id: "focused",      name: "Focused",       describe: "+3 Intellect", mods: { INT: 3 } },
+  charismatic:  { id: "charismatic",  name: "Charismatic",   describe: "+3 Charisma",  mods: { CHA: 3 } },
+  fortunate:    { id: "fortunate",    name: "Fortunate",     describe: "+3 Luck",      mods: { LUK: 3 } },
+
   // Knight
   iron_grip:    { id: "iron_grip",    name: "Iron Grip",     describe: "+6 Strength",  mods: { STR: 6 } },
   unbreakable:  { id: "unbreakable",  name: "Unbreakable",   describe: "+8 Endurance", mods: { END: 8 } },

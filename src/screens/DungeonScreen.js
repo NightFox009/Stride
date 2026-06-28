@@ -158,7 +158,7 @@ export default function DungeonScreen({ onBack }) {
         <Text style={styles.title}>Dungeon</Text>
         <View style={styles.card}>
           <Text style={[styles.outcome, { color: cleared ? colors.accent : colors.danger }]}>
-            {cleared ? "Floor cleared!" : r.outcome === "lost" || r.outcome === "defeat" ? "You fell in the dungeon." : "You fled."}
+            {cleared ? "Floor cleared!" : r.outcome === "fled" ? "You fled — the run is lost." : "You fell in the dungeon."}
           </Text>
           <Text style={styles.rewardLine}>+{r.xp || 0} XP   ·   +{r.gold || 0} gold   ·   {r.energySpent || 0}⚡ spent</Text>
           {levelsGained.length > 0 && (
@@ -237,7 +237,7 @@ export default function DungeonScreen({ onBack }) {
             />
           );
         })}
-        <ActionBtn label="Flee" tone="danger" disabled={autoOn} onPress={() => { sessionRef.current.flee(); rerender(); }} />
+        <ActionBtn label="Flee" sub="forfeit run" tone="danger" disabled={autoOn} onPress={() => { sessionRef.current.flee(); rerender(); }} />
       </View>
 
       <Log events={snap.log} tail={10} />

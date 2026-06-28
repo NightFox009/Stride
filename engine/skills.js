@@ -88,6 +88,53 @@ export const SKILLS = {
   },
 
   // ════════════════════════════════════════════════════════════
+  // Early tier (Lv1 learnable + Lv5) — gives skill points an early sink.
+  // Each scales off its class's signature stat.
+  // ════════════════════════════════════════════════════════════
+
+  // Knight (STR)
+  cleave: { id: "cleave", name: "Cleave", cost: 4, target: "single", describe: "A quick STR swing.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.STR * 2.0, "physical")] },
+  crushing_blow: { id: "crushing_blow", name: "Crushing Blow", cost: 6, target: "single", describe: "A weighty STR smash.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.STR * 3.0, "physical")] },
+
+  // Sentinel (VIT)
+  taunt_slam: { id: "taunt_slam", name: "Taunt Slam", cost: 4, target: "single", describe: "VIT strike and raise guard.",
+    effect: (ctx) => { ctx.user.guard = true; return [{ type: "buff", target: ctx.user.name, buff: "guard" }, ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.VIT * 1.8, "physical")]; } },
+  guardian_strike: { id: "guardian_strike", name: "Guardian Strike", cost: 6, target: "single", describe: "VIT strike that mends a little.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.VIT * 2.6, "physical"), ctx.heal(ctx.user, Math.round(ctx.user.stats.VIT * 0.6))] },
+
+  // Monk (END)
+  jab: { id: "jab", name: "Jab", cost: 4, target: "single", describe: "A swift END strike.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.END * 2.0, "physical")] },
+  pressure_point: { id: "pressure_point", name: "Pressure Point", cost: 6, target: "single", describe: "END strike that may stun.",
+    effect: (ctx) => { const t = ctx.targets[0]; const e = [ctx.dealDamage(ctx.user, t, ctx.user.stats.END * 2.8, "physical")]; if (ctx.rng.chance(20)) { t.stunned = true; e.push({ type: "status", target: t.name, status: "stunned" }); } return e; } },
+
+  // Ranger (AGI)
+  aimed_shot: { id: "aimed_shot", name: "Aimed Shot", cost: 4, target: "single", describe: "A careful AGI shot.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.AGI * 2.0, "physical", { critBonus: 10 })] },
+  piercing_shot: { id: "piercing_shot", name: "Piercing Shot", cost: 6, target: "single", describe: "A penetrating AGI shot.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.AGI * 2.8, "physical", { critBonus: 15 })] },
+
+  // Scholar (INT)
+  spark: { id: "spark", name: "Spark", cost: 4, target: "single", describe: "A small INT magic jolt.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.INT * 2.0, "magic")] },
+  flame_burst: { id: "flame_burst", name: "Flame Burst", cost: 6, target: "single", describe: "A burst of INT fire.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.INT * 2.8, "magic")] },
+
+  // Herald (CHA)
+  taunting_shout: { id: "taunting_shout", name: "Taunting Shout", cost: 4, target: "single", describe: "A CHA jab at the foe.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.CHA * 2.0, "magic")] },
+  war_cry: { id: "war_cry", name: "War Cry", cost: 6, target: "single", describe: "A rallying CHA strike.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.CHA * 2.8, "magic")] },
+
+  // Wanderer (LUK)
+  coin_toss: { id: "coin_toss", name: "Coin Toss", cost: 4, target: "single", describe: "A LUK strike, often critical.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.LUK * 2.0, "physical", { critBonus: 10 })] },
+  gambit: { id: "gambit", name: "Gambit", cost: 6, target: "single", describe: "A risky LUK gamble.",
+    effect: (ctx) => { const mult = 0.6 + ctx.rng.next() * (1.6 + ctx.user.stats.LUK * 0.04); return [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.LUK * 2.2 * mult, "physical")]; } },
+
+  // ════════════════════════════════════════════════════════════
   // Tier skills — learned with skill points at level thresholds.
   // Each still scales off its class's signature stat (design principle).
   // ════════════════════════════════════════════════════════════
