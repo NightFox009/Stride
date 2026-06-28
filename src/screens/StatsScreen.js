@@ -1,15 +1,16 @@
 // Stats screen: spend stat points and read the derived combat sheet. Hidden
 // classes unlock at 1000 in a stat, so we show progress toward the next one.
 
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { STATS, STAT_NAMES } from "../../engine/stats.js";
 import { useStride } from "../state/StrideContext.js";
 import { colors, spacing } from "../theme.js";
 
 export default function StatsScreen({ onBack }) {
-  const { profile, sheet, spendStatPoint } = useStride();
+  const { profile, sheet, spendStatPoint, resetGame } = useStride();
   const canSpend = profile.statPoints > 0;
+  const [confirmReset, setConfirmReset] = useState(false);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -55,6 +56,20 @@ export default function StatsScreen({ onBack }) {
         <Derived k="Dodge Chance" v={`${sheet.dodgeChance.toFixed(1)}%`} />
         <Derived k="Speed" v={sheet.speed} />
       </View>
+
+      <Pressable
+        onPress={() => (confirmReset ? resetGame() : setConfirmReset(true))}
+        style={[styles.reset, confirmReset && styles.resetArmed]}
+      >
+        <Text style={[styles.resetText, confirmReset && styles.resetTextArmed]}>
+          {confirmReset ? "Tap again to erase & start over" : "Reset character"}
+        </Text>
+      </Pressable>
+      {confirmReset && (
+        <Pressable onPress={() => setConfirmReset(false)} style={styles.cancel}>
+          <Text style={styles.cancelText}>Cancel</Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
@@ -114,4 +129,16 @@ const styles = StyleSheet.create({
   },
   derivedKey: { color: colors.textDim, fontSize: 14 },
   derivedVal: { color: colors.text, fontSize: 14, fontWeight: "700" },
+  reset: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingVertical: spacing(1.5),
+    alignItems: "center",
+  },
+  resetArmed: { borderColor: colors.danger, backgroundColor: colors.surface },
+  resetText: { color: colors.textDim, fontSize: 14, fontWeight: "700" },
+  resetTextArmed: { color: colors.danger },
+  cancel: { alignItems: "center", paddingVertical: spacing(1.25) },
+  cancelText: { color: colors.textDim, fontSize: 13 },
 });
