@@ -6,7 +6,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { STATS, STAT_NAMES } from "../../engine/stats.js";
 import { BASE_CLASSES } from "../../engine/classes.js";
 import { passiveMods } from "../../engine/passives.js";
-import { maxPerStat, investedPoints } from "../game/profile.js";
+import { maxPerStat, investedPoints, deriveSheet } from "../game/profile.js";
 import { useStride } from "../state/StrideContext.js";
 import RadarChart from "../components/RadarChart.js";
 import { colors, spacing, STAT_COLORS } from "../theme.js";
@@ -47,6 +47,23 @@ export default function StatsScreen({ onBack, onOpenSkills, onOpenJobs }) {
     color: STAT_COLORS[stat],
     emphasized: stat === boost,
   }));
+
+  // Live preview of the combat sheet with the pending draft applied, plus the
+  // delta vs the committed sheet so each derived stat shows e.g. "Attack +6".
+  const previewProfile = {
+    ...profile,
+    stats: STATS.reduce((o, s) => ((o[s] = profile.stats[s] + draft[s]), o), {}),
+  };
+  const pv = deriveSheet(previewProfile);
+  const sheetRows = [
+    { k: "Max HP", v: pv.maxHP, d: pv.maxHP - sheet.maxHP },
+    { k: "Max MP", v: pv.maxMP, d: pv.maxMP - sheet.maxMP },
+    { k: "Attack", v: pv.attack, d: pv.attack - sheet.attack },
+    { k: "Skill Power", v: pv.skillPower, d: pv.skillPower - sheet.skillPower },
+    { k: "Crit Chance", v: pv.critChance, d: pv.critChance - sheet.critChance, pct: true },
+    { k: "Dodge Chance", v: pv.dodgeChance, d: pv.dodgeChance - sheet.dodgeChance, pct: true },
+    { k: "Speed", v: pv.speed, d: pv.speed - sheet.speed },
+  ];
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -129,15 +146,13 @@ export default function StatsScreen({ onBack, onOpenSkills, onOpenJobs }) {
         </Text>
       </Pressable>
 
-      <Text style={styles.sectionTitle}>Combat sheet</Text>
+      <Text style={styles.sectionTitle}>
+        Combat sheet{draftTotal > 0 ? <Text style={styles.previewTag}>  · preview</Text> : null}
+      </Text>
       <View style={styles.card}>
-        <Derived k="Max HP" v={sheet.maxHP} />
-        <Derived k="Max MP" v={sheet.maxMP} />
-        <Derived k="Attack" v={sheet.attack} />
-        <Derived k="Skill Power" v={sheet.skillPower} />
-        <Derived k="Crit Chance" v={`${sheet.critChance.toFixed(1)}%`} />
-        <Derived k="Dodge Chance" v={`${sheet.dodgeChance.toFixed(1)}%`} />
-        <Derived k="Speed" v={sheet.speed} />
+        {sheetRows.map((r) => (
+          <Derived key={r.k} k={r.k} v={r.pct ? `${r.v.toFixed(1)}%` : r.v} d={r.d} pct={r.pct} />
+        ))}
       </View>
 
       <Pressable
@@ -157,11 +172,18 @@ export default function StatsScreen({ onBack, onOpenSkills, onOpenJobs }) {
   );
 }
 
-function Derived({ k, v }) {
+function Derived({ k, v, d = 0, pct }) {
+  const show = Math.abs(d) > (pct ? 0.05 : 0);
+  const deltaText = show ? `${d > 0 ? "+" : "−"}${pct ? Math.abs(d).toFixed(1) + "%" : Math.abs(d)}` : null;
   return (
     <View style={styles.derivedRow}>
       <Text style={styles.derivedKey}>{k}</Text>
-      <Text style={styles.derivedVal}>{v}</Text>
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        {deltaText ? (
+          <Text style={[styles.delta, d > 0 ? styles.deltaUp : styles.deltaDown]}>{deltaText}</Text>
+        ) : null}
+        <Text style={styles.derivedVal}>{v}</Text>
+      </View>
     </View>
   );
 }
@@ -210,7 +232,11 @@ const styles = StyleSheet.create({
   sectionTitle: { color: colors.text, fontSize: 16, fontWeight: "700", marginBottom: spacing(1) },
   derivedRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: spacing(0.75) },
   derivedKey: { color: colors.textDim, fontSize: 14 },
-  derivedVal: { color: colors.text, fontSize: 14, fontWeight: "700" },
+  derivedVal: { color: colors.text, fontSize: 14, fontWeight: "700", minWidth: 52, textAlign: "right" },
+  delta: { fontSize: 13, fontWeight: "800", marginRight: spacing(1) },
+  deltaUp: { color: colors.accent },
+  deltaDown: { color: colors.hp },
+  previewTag: { color: colors.gold, fontSize: 13, fontWeight: "700" },
   resetChar: {
     borderWidth: 1, borderColor: colors.border, borderRadius: 12,
     paddingVertical: spacing(1.5), alignItems: "center",
