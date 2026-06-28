@@ -58,11 +58,14 @@ export default function StatsScreen({ onBack, onOpenSkills, onOpenJobs }) {
   const sheetRows = [
     { k: "Max HP", v: pv.maxHP, d: pv.maxHP - sheet.maxHP },
     { k: "Max MP", v: pv.maxMP, d: pv.maxMP - sheet.maxMP },
+    { k: "HP Regen / floor", v: pv.hpRegen, d: pv.hpRegen - sheet.hpRegen },
     { k: "Attack", v: pv.attack, d: pv.attack - sheet.attack },
     { k: "Skill Power", v: pv.skillPower, d: pv.skillPower - sheet.skillPower },
     { k: "Crit Chance", v: pv.critChance, d: pv.critChance - sheet.critChance, pct: true },
+    { k: "Crit Damage", v: pv.critMult, d: pv.critMult - sheet.critMult, mult: true },
     { k: "Dodge Chance", v: pv.dodgeChance, d: pv.dodgeChance - sheet.dodgeChance, pct: true },
-    { k: "Speed", v: pv.speed, d: pv.speed - sheet.speed },
+    { k: "Flee Chance", v: pv.fleeChance, d: pv.fleeChance - sheet.fleeChance, pct: true },
+    { k: "Attack Speed", v: pv.speed, d: pv.speed - sheet.speed },
   ];
 
   return (
@@ -151,7 +154,13 @@ export default function StatsScreen({ onBack, onOpenSkills, onOpenJobs }) {
       </Text>
       <View style={styles.card}>
         {sheetRows.map((r) => (
-          <Derived key={r.k} k={r.k} v={r.pct ? `${r.v.toFixed(1)}%` : r.v} d={r.d} pct={r.pct} />
+          <Derived
+            key={r.k}
+            k={r.k}
+            v={r.mult ? `${Math.round(r.v * 100)}%` : r.pct ? `${r.v.toFixed(1)}%` : r.v}
+            d={r.mult ? r.d * 100 : r.d}
+            pct={r.pct || r.mult}
+          />
         ))}
       </View>
 

@@ -17,6 +17,12 @@ import { floorType } from "./floors.js";
 export const CORE_TIER_SIZE = 12;
 export const STAT_PER_TIER = 2; // reward-stat points per tier (normal monster)
 export const KIND_MULT = { normal: 1, elite: 2, boss: 3 };
+// Some monsters reward flat Max HP or HP regen instead of a stat; HP is scaled
+// up since it's on the maxHP magnitude.
+const REWARD_SCALE = { HP: 10 };
+export function rewardLabel(reward) {
+  return reward === "HPREGEN" ? "HP Regen" : reward;
+}
 export const COMBAT_CORE_CHANCE = 0.12; // per monster type, per cleared floor
 export const IDLE_CAP_MS = 8 * 60 * 60 * 1000; // offline idle accrues up to 8h
 
@@ -33,24 +39,31 @@ export function tieredCount(knowledge = {}) {
 export function nextTierAt(cores = 0) {
   return (knowledgeTier(cores) + 1) * CORE_TIER_SIZE;
 }
-// The reward stat + amount a monster currently grants (for the UI).
+// The reward (stat / HP / HP-regen) + amount a monster currently grants.
 export function monsterReward(monster, cores = 0) {
   if (!monster || !monster.reward) return null;
   const tier = knowledgeTier(cores);
-  const amount = tier * STAT_PER_TIER * (KIND_MULT[monster.kind] || 1);
+  const amount = tier * STAT_PER_TIER * (KIND_MULT[monster.kind] || 1) * (REWARD_SCALE[monster.reward] || 1);
   return { stat: monster.reward, tier, amount };
 }
 
-// Total stat bonuses from the whole knowledge book: { STAT: total }. Each
-// studied monster contributes its reward stat scaled by tier (and kind).
-export function knowledgeStatBonus(knowledge = {}) {
-  const mods = {};
+// All knowledge-book bonuses: { stats: {STAT: n}, hp, hpRegen }.
+export function knowledgeBonuses(knowledge = {}) {
+  const stats = {};
+  let hp = 0, hpRegen = 0;
   for (const [id, cores] of Object.entries(knowledge)) {
-    const m = ENEMIES[id];
-    const r = monsterReward(m, cores);
-    if (r && r.amount > 0) mods[r.stat] = (mods[r.stat] || 0) + r.amount;
+    const r = monsterReward(ENEMIES[id], cores);
+    if (!r || r.amount <= 0) continue;
+    if (r.stat === "HP") hp += r.amount;
+    else if (r.stat === "HPREGEN") hpRegen += r.amount;
+    else stats[r.stat] = (stats[r.stat] || 0) + r.amount;
   }
-  return mods;
+  return { stats, hp, hpRegen };
+}
+
+// Just the stat bonuses (folded into the combat stat block).
+export function knowledgeStatBonus(knowledge = {}) {
+  return knowledgeBonuses(knowledge).stats;
 }
 
 // Monster ids that appear on a floor (its zone pool + the floor's elite/boss).

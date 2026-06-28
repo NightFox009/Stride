@@ -1,5 +1,5 @@
 // Central app state: owns the profile, loads/saves it, and exposes the actions
-// the screens call. This is the single place steps turn into EXP/Energy.
+// the screens call. This is the single place steps turn into EXP.
 
 import React, {
   createContext,
@@ -15,7 +15,6 @@ import {
   applySteps,
   convertSteps,
   applyAllocation,
-  applyEnergyRegen,
   applyHpRegen,
   vitals,
   startCamp,
@@ -33,9 +32,9 @@ import {
   combatStats,
   primaryStatOf,
   allowedWeaponTypes,
+  knowledgeHpBonuses,
 } from "../game/profile.js";
 import { createFloorSession } from "../../engine/dungeonSession.js";
-import { energyCost } from "../../engine/floors.js";
 import { createRng } from "../../engine/rng.js";
 
 const StrideContext = createContext(null);
@@ -56,7 +55,7 @@ export function StrideProvider({ children }) {
     (async () => {
       const saved = await loadProfile();
       if (!cancelled) {
-        let init = saved ? applyHpRegen(applyEnergyRegen(saved)) : saved;
+        let init = saved ? applyHpRegen(saved) : saved;
         // Grant offline idle accrual on return, then keep camping.
         if (init && init.idle) init = claimCamp(init).profile;
         setProfile(init);
@@ -68,11 +67,11 @@ export function StrideProvider({ children }) {
     };
   }, []);
 
-  // Tick Energy regen every 30s while the app is open. applyEnergyRegen returns
-  // the same object when nothing changed, so this is a no-op render otherwise.
+  // Tick HP/MP regen every 30s while the app is open. applyHpRegen returns the
+  // same object when nothing changed, so this is a no-op render otherwise.
   useEffect(() => {
     const id = setInterval(() => {
-      setProfile((p) => (p ? applyHpRegen(applyEnergyRegen(p)) : p));
+      setProfile((p) => (p ? applyHpRegen(p) : p));
     }, 30000);
     return () => clearInterval(id);
   }, []);
@@ -102,11 +101,11 @@ export function StrideProvider({ children }) {
     setProfile(next);
   }, []);
 
-  // Convert banked steps into "exp" or "energy". Returns the summary for the UI.
-  const convert = useCallback((mode) => {
+  // Convert banked steps into EXP. Returns the summary for the UI.
+  const convert = useCallback(() => {
     const p = profileRef.current;
     if (!p) return null;
-    const { profile: next, converted } = convertSteps(p, mode);
+    const { profile: next, converted } = convertSteps(p);
     setProfile(next);
     if (converted.steps > 0) setLastEarned(converted);
     return converted;
@@ -144,17 +143,17 @@ export function StrideProvider({ children }) {
   }, []);
 
   // Start an interactive dungeon floor. Returns a session controller (see
-  // engine/dungeonSession.js) the screen drives turn by turn, or null if there
-  // isn't enough Energy. Rewards are applied later via commitFloorResult.
+  // engine/dungeonSession.js) the screen drives turn by turn. Descents are free
+  // and unlimited (idle-style). Rewards are applied later via commitFloorResult.
   const beginFloorSession = useCallback(() => {
     let p = profileRef.current;
     if (!p) return null;
-    // Catch up regen so the freshest Energy/HP gate the descent.
-    const regen = applyHpRegen(applyEnergyRegen(p));
+    // Catch up HP/MP regen before the descent.
+    const regen = applyHpRegen(p);
     if (regen !== p) { p = regen; setProfile(p); }
     const floor = p.floor || 1;
-    if (p.energy < energyCost(floor)) return null;
     const v = vitals(p);
+    const kb = knowledgeHpBonuses(p);
     return createFloorSession({
       floor,
       stats: combatStats(p), // base + passives + job perk
@@ -163,6 +162,8 @@ export function StrideProvider({ children }) {
       primaryStat: primaryStatOf(p),
       weaponTypes: allowedWeaponTypes(p),
       classId: p.classId,
+      knowledgeHP: kb.hp,
+      knowledgeRegen: kb.hpRegen,
       startHP: v.hp,
       startMP: v.mp,
       level: p.level,
@@ -203,7 +204,6 @@ export function StrideProvider({ children }) {
     stopIdle,
     beginFloorSession,
     commitFloorResult,
-    floorCost: profile ? energyCost(profile.floor || 1) : 0,
   };
 
   return <StrideContext.Provider value={value}>{children}</StrideContext.Provider>;

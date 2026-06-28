@@ -63,7 +63,7 @@ const ROSTER = [
   norm("forest_wolf", "Forest Wolf", "swift", "AGI"),
   norm("bandit", "Wood Bandit", "brute", "STR"),
   norm("pixie", "Wild Pixie", "trickster", "LUK"),
-  norm("treant_sapling", "Treant Sapling", "tank", "VIT"),
+  norm("treant_sapling", "Treant Sapling", "tank", "HPREGEN"),
   norm("forest_sprite", "Forest Sprite", "caster", "INT"),
   elite("dire_wolf", "Dire Wolf", "AGI"),
   boss("bandit_king", "Bandit King", "STR"),
@@ -80,7 +80,7 @@ const ROSTER = [
   // Zone 4 — Ember Depths
   norm("fire_imp", "Fire Imp", "trickster", "LUK"),
   norm("magma_hound", "Magma Hound", "brute", "STR"),
-  norm("ash_golem", "Ash Golem", "tank", "VIT"),
+  norm("ash_golem", "Ash Golem", "tank", "HP"),
   norm("flame_wisp", "Flame Wisp", "caster", "INT"),
   norm("cinder_sprite", "Cinder Sprite", "swift", "AGI"),
   elite("cinder_brute", "Cinder Brute", "STR"),
@@ -88,7 +88,7 @@ const ROSTER = [
 
   // Zone 5 — Frozen Hollow
   norm("frost_wisp", "Frost Wisp", "caster", "INT"),
-  norm("ice_troll", "Ice Troll", "tank", "VIT"),
+  norm("ice_troll", "Ice Troll", "tank", "HPREGEN"),
   norm("snow_stalker", "Snow Stalker", "swift", "AGI"),
   norm("frost_imp", "Frost Imp", "trickster", "LUK"),
   norm("ice_brute", "Ice Brute", "brute", "STR"),
@@ -127,13 +127,13 @@ const ROSTER = [
   norm("wyvern", "Wyvern", "swift", "AGI"),
   norm("dragonkin", "Dragonkin", "balanced", "END"),
   norm("drake_mage", "Drake Mage", "caster", "INT"),
-  norm("scale_brute", "Scale Brute", "tank", "VIT"),
+  norm("scale_brute", "Scale Brute", "tank", "HP"),
   elite("young_dragon", "Young Dragon", "STR"),
   boss("elder_dragon", "Elder Dragon", "END"),
 
   // Zone 10 — The Abyss
   norm("voidspawn", "Voidspawn", "swift", "AGI"),
-  norm("horror", "Crawling Horror", "tank", "VIT"),
+  norm("horror", "Crawling Horror", "tank", "HP"),
   norm("abomination", "Abomination", "brute", "STR"),
   norm("void_caster", "Void Caster", "caster", "INT"),
   norm("chaos_imp", "Chaos Imp", "trickster", "LUK"),

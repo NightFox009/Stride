@@ -8,7 +8,7 @@ import { derive } from "../../engine/stats.js";
 import { effectiveStats, treeFor, maxLevelFor, rankLevelReq } from "../../engine/classTree.js";
 import { getJob, jobsFor, JOB_LEVEL, classWeaponTypes } from "../../engine/jobs.js";
 import { equipmentMods, SLOTS, CLASS_GEAR } from "../../engine/items.js";
-import { idleRewards, knowledgeStatBonus } from "../../engine/knowledge.js";
+import { idleRewards, knowledgeBonuses } from "../../engine/knowledge.js";
 import {
   upgradeCost,
   rarityUpgradeCost,
@@ -19,15 +19,11 @@ import {
 import {
   gainExp as engineGainExp,
   stepsToXP,
-  stepsToEnergy,
   levelHpBonus,
   TUNING,
 } from "../../engine/progression.js";
 
 export const SAVE_VERSION = 1;
-export const MAX_ENERGY = 200; // hard cap on stored Energy
-export const BASE_ENERGY = 100; // starting Energy for a new character
-export const ENERGY_REGEN_MS = 10 * 60 * 1000; // +1 Energy per 10 real minutes
 export const HP_REGEN_PER_MIN = 0.06; // fraction of max HP recovered per real minute
 export const MP_REGEN_PER_MIN = 0.08; // fraction of max MP per real minute
 // At most 2 of every 3 earned stat points may sit on one stat (so a level's
@@ -60,14 +56,12 @@ export function createProfile(classId) {
     currentHP: null, // carried HP between floors (null = full)
     currentMP: null, // carried MP between floors (null = full)
     lastRestTick: Date.now(), // for time-based HP/MP regen
-    energy: BASE_ENERGY,
     gold: 0,
     // Deepest floor not yet cleared — the dungeon's "current floor".
     floor: 1,
-    // Raw steps waiting to be converted into EXP or Energy by the player.
+    // Raw steps waiting to be converted into EXP by the player.
     totalSteps: 0,
     stepBank: 0,
-    lastEnergyTick: Date.now(), // for time-based Energy regen
     lastSyncAt: Date.now(),
   };
 }
@@ -86,9 +80,15 @@ export function combatStats(profile) {
   const eq = equipmentMods(profile.equipment || {});
   for (const [k, v] of Object.entries(eq)) s[k] = (s[k] || 0) + v;
   // Knowledge: each studied monster grants its reward stat.
-  const kb = knowledgeStatBonus(profile.knowledge || {});
+  const kb = knowledgeBonuses(profile.knowledge || {}).stats;
   for (const [k, v] of Object.entries(kb)) s[k] = (s[k] || 0) + v;
   return s;
+}
+
+// Knowledge HP / HP-regen bonuses (flat, not stat-block).
+export function knowledgeHpBonuses(profile) {
+  const { hp, hpRegen } = knowledgeBonuses(profile.knowledge || {});
+  return { hp, hpRegen };
 }
 
 // The stat that drives basic-attack damage: the awakened job's primary stat, or
@@ -141,20 +141,24 @@ export function awakenJob(profile, jobId) {
 // full combat stats so passives AND the job perk are reflected.
 export function deriveSheet(profile) {
   const s = combatStats(profile);
+  const kb = knowledgeBonuses(profile.knowledge || {});
   return {
-    maxHP: derive.maxHP(s) + levelHpBonus(profile.level),
+    maxHP: derive.maxHP(s) + levelHpBonus(profile.level) + (kb.hp || 0),
     maxMP: derive.maxMP(s),
     attack: derive.attack(s, primaryStatOf(profile)),
     skillPower: derive.skillPower(s),
     critChance: derive.critChance(s),
+    critMult: derive.critMult(s), // crit damage multiplier
     dodgeChance: derive.dodgeChance(s),
-    speed: derive.speed(s),
+    fleeChance: derive.fleeChance(s),
+    speed: derive.speed(s), // initiative / attack speed
+    hpRegen: derive.hpRegenPerFloor(s) + (kb.hpRegen || 0), // between-wave HP recovery
     expToNext: Math.round(TUNING.baseXP * Math.pow(profile.level, 1.5)),
   };
 }
 
 // Banks new steps. Steps no longer auto-convert — the player chooses to spend
-// the bank on EXP or Energy via convertSteps().
+// the bank on EXP via convertSteps().
 export function applySteps(profile, newSteps) {
   newSteps = Math.max(0, Math.floor(newSteps));
   if (newSteps === 0) return { profile, earned: { steps: 0 } };
@@ -166,52 +170,32 @@ export function applySteps(profile, newSteps) {
   return { profile: p, earned: { steps: newSteps } };
 }
 
-// How much EXP / Energy the current step bank could yield right now (Energy is
-// limited by remaining capacity under MAX_ENERGY).
+// How much EXP the current step bank could yield right now.
 export function conversionPreview(profile) {
   const bank = profile.stepBank || 0;
-  const capacity = Math.max(0, MAX_ENERGY - (profile.energy || 0));
-  return {
-    bank,
-    xp: stepsToXP(bank),
-    energy: Math.min(stepsToEnergy(bank), capacity),
-  };
+  return { bank, xp: stepsToXP(bank) };
 }
 
-// Convert banked steps into either EXP ("exp") or Energy ("energy"). Consumes
-// only the whole-unit portion; the remainder stays banked. Returns a new profile
-// plus a summary for the UI.
-export function convertSteps(profile, mode) {
+// Convert banked steps into EXP. Consumes only the whole-unit portion; the
+// remainder stays banked. Returns a new profile plus a summary for the UI.
+export function convertSteps(profile) {
   let p = { ...profile };
   const bank = p.stepBank || 0;
-
-  if (mode === "exp") {
-    const xp = stepsToXP(bank);
-    if (xp <= 0) return { profile, converted: { mode, steps: 0, xp: 0, levelsGained: [] } };
-    p.stepBank = bank - xp * TUNING.stepsPerXP;
-    const res = engineGainExp(p, xp);
-    p = res.profile;
-    const levelsGained = res.levelsGained;
-    p.skillPoints = (p.skillPoints || 0) + levelsGained.length; // 1 skill point / level
-    return { profile: p, converted: { mode, steps: xp * TUNING.stepsPerXP, xp, levelsGained } };
-  }
-
-  // energy
-  const capacity = Math.max(0, MAX_ENERGY - (p.energy || 0));
-  const energy = Math.min(stepsToEnergy(bank), capacity);
-  if (energy <= 0) return { profile, converted: { mode, steps: 0, energy: 0 } };
-  p.stepBank = bank - energy * TUNING.stepsPerEnergy;
-  p.energy = (p.energy || 0) + energy;
-  return { profile: p, converted: { mode, steps: energy * TUNING.stepsPerEnergy, energy } };
+  const xp = stepsToXP(bank);
+  if (xp <= 0) return { profile, converted: { steps: 0, xp: 0, levelsGained: [] } };
+  p.stepBank = bank - xp * TUNING.stepsPerXP;
+  const res = engineGainExp(p, xp);
+  p = res.profile;
+  const levelsGained = res.levelsGained;
+  p.skillPoints = (p.skillPoints || 0) + levelsGained.length; // 1 skill point / level
+  return { profile: p, converted: { steps: xp * TUNING.stepsPerXP, xp, levelsGained } };
 }
 
-// Fold a completed dungeon-floor result (from engine/dungeon.js runFloor) back
-// into the profile: spend the energy, bank loot, award EXP through the engine
-// (handling level-ups), and advance the floor on a clear. Returns a new profile
-// plus the level-ups gained so the UI can celebrate them.
+// Fold a completed dungeon-floor result back into the profile: bank loot, award
+// EXP through the engine (handling level-ups), and advance the floor on a clear.
+// Returns a new profile plus the level-ups gained so the UI can celebrate them.
 export function applyFloorResult(profile, result) {
   let p = { ...profile };
-  p.energy = Math.max(0, p.energy - (result.energySpent || 0));
   p.gold += result.gold || 0;
 
   let levelsGained = [];
@@ -398,29 +382,6 @@ export function sellItem(profile, itemId) {
   return { ...profile, inventory: inv.filter((i) => i.id !== itemId), gold: (profile.gold || 0) + value };
 }
 
-// Regenerate Energy from elapsed real time (+1 per ENERGY_REGEN_MS), up to the
-// cap. Advances lastEnergyTick only by the Energy actually granted so partial
-// progress isn't lost. Returns the SAME profile object when nothing changed, so
-// callers can pass it straight to setState without causing a needless re-render.
-export function applyEnergyRegen(profile, now = Date.now()) {
-  if (!profile) return profile;
-  const energy = profile.energy || 0;
-  const last = profile.lastEnergyTick || profile.createdAt || now;
-
-  if (energy >= MAX_ENERGY) {
-    if (profile.lastEnergyTick === now) return profile;
-    return { ...profile, lastEnergyTick: now }; // keep tick fresh while full
-  }
-
-  const elapsed = now - last;
-  if (elapsed < ENERGY_REGEN_MS) return profile;
-
-  const space = MAX_ENERGY - energy;
-  const gain = Math.min(Math.floor(elapsed / ENERGY_REGEN_MS), space);
-  const newTick = gain >= space ? now : last + gain * ENERGY_REGEN_MS;
-  return { ...profile, energy: energy + gain, lastEnergyTick: newTick };
-}
-
 // Current HP/MP (carried between floors) clamped to the live maximums.
 export function vitals(profile) {
   const { maxHP, maxMP } = deriveSheet(profile);
@@ -458,12 +419,6 @@ export function applyHpRegen(profile, now = Date.now()) {
   };
 }
 
-// Milliseconds until the next +1 Energy (null if full).
-export function msToNextEnergy(profile, now = Date.now()) {
-  if (!profile || (profile.energy || 0) >= MAX_ENERGY) return null;
-  const last = profile.lastEnergyTick || profile.createdAt || now;
-  return Math.max(0, ENERGY_REGEN_MS - ((now - last) % ENERGY_REGEN_MS));
-}
 
 // Points invested into each stat from leveling (current value minus the class
 // starting block — the class's own +1 doesn't count toward the focus cap).

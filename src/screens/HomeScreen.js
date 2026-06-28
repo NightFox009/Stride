@@ -1,4 +1,4 @@
-// Home: the avatar dashboard and the live walk loop. Shows level/EXP/Energy,
+// Home: the avatar dashboard and the live walk loop. Shows level/EXP/HP/MP,
 // wires the pedometer, and (when no pedometer is available) offers manual
 // "walk" controls so the loop is fully testable on web/simulator.
 
@@ -9,22 +9,14 @@ import { useStepSource } from "../steps/useStepSource.js";
 import { unlockedHiddenClasses } from "../../engine/classes.js";
 import ProgressBar from "../components/ProgressBar.js";
 import Avatar, { evolutionStage, STAGE_TITLES } from "../components/Avatar.js";
-import { conversionPreview, msToNextEnergy, MAX_ENERGY } from "../game/profile.js";
+import { conversionPreview } from "../game/profile.js";
 import { getJob } from "../../engine/jobs.js";
 import { colors, spacing } from "../theme.js";
 
 const STAGE_THRESHOLDS = [10, 20, 30, 50];
 
-function regenLabel(profile) {
-  if ((profile.energy || 0) >= MAX_ENERGY) return "Energy full";
-  const ms = msToNextEnergy(profile);
-  if (ms == null) return "";
-  const m = Math.ceil(ms / 60000);
-  return `+1⚡ in ~${m} min`;
-}
-
 export default function HomeScreen({ onOpenStats, onOpenDungeon, onOpenInventory, onOpenKnowledge }) {
-  const { profile, sheet, vitals, ingestSteps, convert, lastEarned, floorCost } = useStride();
+  const { profile, sheet, vitals, ingestSteps, convert, lastEarned } = useStride();
   const { available, error, addManualSteps } = useStepSource(ingestSteps);
 
   const hidden = unlockedHiddenClasses(profile.stats);
@@ -68,8 +60,6 @@ export default function HomeScreen({ onOpenStats, onOpenDungeon, onOpenInventory
       {/* Resource bars */}
       <View style={styles.card}>
         <ProgressBar label="EXP" value={profile.exp} max={sheet.expToNext} color={colors.exp} />
-        <ProgressBar label="Energy" value={profile.energy} max={MAX_ENERGY} color={colors.accent} suffix="⚡" />
-        <Text style={styles.regen}>{regenLabel(profile)}</Text>
         <ProgressBar label="HP" value={vitals.hp} max={vitals.maxHP} color={colors.hp} />
         <ProgressBar label="MP" value={vitals.mp} max={vitals.maxMP} color={colors.exp} />
         {(vitals.hp < vitals.maxHP || vitals.mp < vitals.maxMP) && (
@@ -83,16 +73,13 @@ export default function HomeScreen({ onOpenStats, onOpenDungeon, onOpenInventory
         </View>
       </View>
 
-      {/* Dungeon entry — the place Energy gets spent. */}
+      {/* Dungeon entry — free to descend, anytime. */}
       <Pressable
         style={({ pressed }) => [styles.dungeonBtn, pressed && styles.dungeonBtnPressed]}
         onPress={onOpenDungeon}
       >
         <Text style={styles.dungeonTitle}>⚔  Enter the Dungeon</Text>
-        <Text style={styles.dungeonSub}>
-          Floor {profile.floor || 1} · {floorCost}⚡
-          {profile.energy >= floorCost ? "  — ready" : "  — need more Energy"}
-        </Text>
+        <Text style={styles.dungeonSub}>Floor {profile.floor || 1} · descend anytime</Text>
       </Pressable>
 
       {/* Steps: bank + convert */}
@@ -122,30 +109,19 @@ export default function HomeScreen({ onOpenStats, onOpenDungeon, onOpenInventory
           ))}
         </View>
 
-        <Text style={styles.convertHint}>Convert banked steps — 10 = 1 EXP, 100 = 1⚡</Text>
+        <Text style={styles.convertHint}>Convert banked steps — 10 steps = 1 EXP</Text>
         <View style={styles.walkRow}>
           <Pressable
             disabled={preview.xp <= 0}
-            onPress={() => convert("exp")}
+            onPress={() => convert()}
             style={[styles.convertBtn, { borderColor: colors.exp }, preview.xp <= 0 && styles.convertOff]}
           >
             <Text style={[styles.convertText, { color: colors.exp }]}>→ EXP  +{preview.xp}</Text>
           </Pressable>
-          <Pressable
-            disabled={preview.energy <= 0}
-            onPress={() => convert("energy")}
-            style={[styles.convertBtn, { borderColor: colors.accent }, preview.energy <= 0 && styles.convertOff]}
-          >
-            <Text style={[styles.convertText, { color: colors.accent }]}>→ Energy  +{preview.energy}⚡</Text>
-          </Pressable>
         </View>
-        {profile.energy >= MAX_ENERGY && (
-          <Text style={styles.capNote}>Energy is full ({MAX_ENERGY}⚡). Convert steps to EXP instead.</Text>
-        )}
         {lastEarned && (
           <Text style={styles.earned}>
-            Converted {lastEarned.steps.toLocaleString()} steps →{" "}
-            {lastEarned.mode === "exp" ? `+${lastEarned.xp} EXP` : `+${lastEarned.energy}⚡`}
+            Converted {lastEarned.steps.toLocaleString()} steps → +{lastEarned.xp} EXP
             {lastEarned.levelsGained?.length
               ? `  •  LEVEL UP → ${lastEarned.levelsGained[lastEarned.levelsGained.length - 1].level}!`
               : ""}

@@ -1,6 +1,6 @@
-// Dungeon: spend Energy to descend, then fight the floor turn by turn — choose
-// Attack, a skill, or flee each turn, pick your target, and read the log. The
-// engine session (engine/dungeonSession.js) holds combat state; this screen
+// Dungeon: descend freely (no energy), then fight the floor turn by turn —
+// choose Attack, a skill, or flee each turn, pick your target, and read the log.
+// The engine session (engine/dungeonSession.js) holds combat state; this screen
 // renders snapshots and forwards the player's choices.
 
 import React, { useEffect, useRef, useState } from "react";
@@ -58,7 +58,7 @@ const TONE_COLOR = {
 };
 
 export default function DungeonScreen({ onBack }) {
-  const { profile, vitals, floorCost, beginFloorSession, commitFloorResult, camp, claimIdle, stopIdle } = useStride();
+  const { profile, vitals, beginFloorSession, commitFloorResult, camp, claimIdle, stopIdle } = useStride();
   const sessionRef = useRef(null);
   const committedRef = useRef(false);
   const [, setTick] = useState(0);
@@ -94,7 +94,6 @@ export default function DungeonScreen({ onBack }) {
 
   const floor = profile.floor || 1;
   const type = floorType(floor);
-  const canDescend = profile.energy >= floorCost;
   const hasUnspent = profile.statPoints > 0;
 
   const descend = () => {
@@ -122,7 +121,6 @@ export default function DungeonScreen({ onBack }) {
         <View style={styles.card}>
           <View style={styles.rowBetween}>
             <Text style={styles.floorNum}>Floor {floor}</Text>
-            <Text style={styles.energy}>{profile.energy}⚡</Text>
           </View>
           <Text style={styles.zone}>{zoneName(floor)}</Text>
           <Text style={styles.blurb}>{FLOOR_BLURB[type] ?? type}</Text>
@@ -142,17 +140,11 @@ export default function DungeonScreen({ onBack }) {
           )}
 
           <Pressable
-            disabled={!canDescend}
             onPress={descend}
-            style={({ pressed }) => [styles.descend, !canDescend && styles.btnDisabled, pressed && canDescend && styles.pressed]}
+            style={({ pressed }) => [styles.descend, pressed && styles.pressed]}
           >
-            <Text style={styles.descendText}>Descend  ·  {floorCost}⚡</Text>
+            <Text style={styles.descendText}>Descend</Text>
           </Pressable>
-          {!canDescend && (
-            <Text style={styles.note}>
-              Need {floorCost}⚡ — walk {Math.max(0, floorCost - profile.energy) * 100} more steps.
-            </Text>
-          )}
         </View>
 
         {/* Idle / camp — stuck on a floor? Camp it for passive EXP + cores. */}
@@ -202,7 +194,7 @@ export default function DungeonScreen({ onBack }) {
           <Text style={[styles.outcome, { color: cleared ? colors.accent : colors.danger }]}>
             {cleared ? "Floor cleared!" : r.outcome === "fled" ? "You fled — the run is lost." : "You fell in the dungeon."}
           </Text>
-          <Text style={styles.rewardLine}>+{r.xp || 0} XP   ·   +{r.gold || 0} gold   ·   {r.energySpent || 0}⚡ spent</Text>
+          <Text style={styles.rewardLine}>+{r.xp || 0} XP   ·   +{r.gold || 0} gold</Text>
           {levelsGained.length > 0 && (
             <Text style={styles.levelUp}>★ Level up → {levelsGained[levelsGained.length - 1].level}!</Text>
           )}
@@ -348,7 +340,6 @@ const styles = StyleSheet.create({
     borderRadius: 14, padding: spacing(2), marginBottom: spacing(1.5),
   },
   floorNum: { color: colors.text, fontSize: 22, fontWeight: "800" },
-  energy: { color: colors.accent, fontSize: 18, fontWeight: "700" },
   zone: { color: colors.gold, fontSize: 13, fontWeight: "700", marginTop: 2 },
   blurb: { color: colors.textDim, fontSize: 14, marginTop: spacing(0.5), lineHeight: 20 },
   vitals: { color: colors.hp, fontSize: 13, marginTop: spacing(0.75), fontWeight: "600" },

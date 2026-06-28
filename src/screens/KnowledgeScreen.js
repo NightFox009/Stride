@@ -5,7 +5,7 @@ import React from "react";
 import { View, Text, ScrollView, StyleSheet } from "react-native";
 import {
   bestiaryByZone, knowledgeTier, nextTierAt, tieredCount, discoveredCount,
-  monsterReward, CORE_TIER_SIZE,
+  monsterReward, rewardLabel, CORE_TIER_SIZE,
 } from "../../engine/knowledge.js";
 import { useStride } from "../state/StrideContext.js";
 import { colors, spacing } from "../theme.js";
@@ -39,8 +39,8 @@ export default function KnowledgeScreen({ onBack }) {
               <View key={m.id} style={styles.row}>
                 <Text style={[styles.mName, !found && styles.unknown]}>
                   {found ? m.name : "???"}
-                  <Text style={styles.kind}>  · gives {m.reward}</Text>
-                  {r && r.tier > 0 ? <Text style={styles.studied}>  ✦ T{r.tier} +{r.amount} {m.reward}</Text> : null}
+                  <Text style={styles.kind}>  · gives {rewardLabel(m.reward)}</Text>
+                  {r && r.tier > 0 ? <Text style={styles.studied}>  ✦ T{r.tier} +{r.amount} {rewardLabel(r.stat)}</Text> : null}
                 </Text>
                 <Text style={styles.cores}>{cores}/{nextTierAt(cores)}</Text>
               </View>

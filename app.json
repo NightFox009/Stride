@@ -14,7 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSMotionUsageDescription": "Stride counts your steps to power your avatar's EXP and Energy."
+        "NSMotionUsageDescription": "Stride counts your steps to power your avatar's EXP."
       }
     },
     "android": {

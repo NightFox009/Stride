@@ -4,7 +4,7 @@
 // reward formulas) so interactive runs obey the same rules as the auto sim.
 
 import { makeCombatant, createBattle } from "./combat.js";
-import { buildWaves, energyCost } from "./floors.js";
+import { buildWaves } from "./floors.js";
 import { derive } from "./stats.js";
 import { SKILLS } from "./skills.js";
 import { TUNING, levelHpBonus } from "./progression.js";
@@ -13,9 +13,9 @@ import { rollMaterials } from "./crafting.js";
 import { COMBAT_CORE_CHANCE } from "./knowledge.js";
 import { createRng } from "./rng.js";
 
-// Same small between-wave recovery as the auto runner.
-function betweenWaveRecovery(player) {
-  const hp = Math.round(player.maxHP * 0.18) + derive.hpRegenPerFloor(player.stats);
+// Small between-wave recovery; knowledge HP regen adds to it.
+function betweenWaveRecovery(player, regenBonus = 0) {
+  const hp = Math.round(player.maxHP * 0.18) + derive.hpRegenPerFloor(player.stats) + regenBonus;
   const mp = Math.round(player.maxMP * 0.3);
   player.hp = Math.min(player.maxHP, player.hp + hp);
   player.mp = Math.min(player.maxMP, player.mp + mp);
@@ -24,17 +24,16 @@ function betweenWaveRecovery(player) {
 
 // Returns a controller: snapshot() for the current view, and act()/attack()/
 // skill()/flee() to take the player's turn. Non-combat floors resolve instantly.
-export function createFloorSession({ floor, stats, skills, skillLevels = {}, primaryStat = "STR", weaponTypes = null, classId = "knight", startHP = null, startMP = null, level = 1, rng = createRng() }) {
-  const cost = energyCost(floor);
+export function createFloorSession({ floor, stats, skills, skillLevels = {}, primaryStat = "STR", weaponTypes = null, classId = "knight", knowledgeHP = 0, knowledgeRegen = 0, startHP = null, startMP = null, level = 1, rng = createRng() }) {
   const { type, waves } = buildWaves(floor, rng);
-  const player = makeCombatant({ name: "You", stats, skills, skillLevels, primaryStat, isPlayer: true, bonusHP: levelHpBonus(level) });
+  const player = makeCombatant({ name: "You", stats, skills, skillLevels, primaryStat, isPlayer: true, bonusHP: levelHpBonus(level) + knowledgeHP });
   // Start from carried HP/MP (rest floors will restore to full below).
   if (startHP != null) player.hp = Math.max(1, Math.min(player.maxHP, startHP));
   if (startMP != null) player.mp = Math.max(0, Math.min(player.maxMP, startMP));
 
   const log = [];
   const emit = (e) => { log.push(e); return e; };
-  emit({ type: "floorStart", floor, floorType: type, waves: waves.length, energyCost: cost });
+  emit({ type: "floorStart", floor, floorType: type, waves: waves.length });
 
   let phase = "fighting"; // fighting | won | lost | fled
   let result = null;
@@ -52,7 +51,7 @@ export function createFloorSession({ floor, stats, skills, skillLevels = {}, pri
     if (outcome === "cleared") {
       for (const id of seen) if (rng.next() < COMBAT_CORE_CHANCE) cores[id] = (cores[id] || 0) + 1;
     }
-    result = { outcome, xp, gold, energySpent: cost, wavesCleared, floor, loot, materials, cores, finalHp: player.hp, finalMp: player.mp };
+    result = { outcome, xp, gold, wavesCleared, floor, loot, materials, cores, finalHp: player.hp, finalMp: player.mp };
     phase = outcome === "cleared" ? "won" : outcome === "defeat" ? "lost" : "fled";
   }
 
@@ -93,7 +92,7 @@ export function createFloorSession({ floor, stats, skills, skillLevels = {}, pri
     emit({ type: "waveCleared", floor, wave: waveIndex + 1, xp: r.xp, gold: r.gold, playerHp: player.hp, playerMp: player.mp });
 
     if (waveIndex < waves.length - 1) {
-      const rec = betweenWaveRecovery(player);
+      const rec = betweenWaveRecovery(player, knowledgeRegen);
       emit({ type: "recover", hp: rec.hp, mp: rec.mp, playerHp: player.hp, playerMp: player.mp });
       waveIndex++;
       startWave();

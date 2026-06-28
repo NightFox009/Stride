@@ -1,8 +1,9 @@
 # Stride
 
 An offline-capable mobile RPG where your real-world **steps** power a personal
-human avatar. Walk to earn EXP and Energy, level up, invest stat points, evolve
-your appearance, and descend a 100-floor turn-based dungeon.
+human avatar. Walk to earn EXP, level up, invest stat points, evolve
+your appearance, and descend a 100-floor turn-based dungeon (free to attempt
+anytime — idle style).
 
 Think Genopets — but the character you grow is **you**, not a pet.
 
@@ -12,7 +13,7 @@ See **[DESIGN.md](./DESIGN.md)** for the full design.
 
 There's now a runnable **React Native + Expo** app that drives the existing
 engine: step tracking (pedometer with a manual fallback), a local offline save,
-and the real **walk → EXP / Energy → level up → spend stat points** loop.
+and the real **walk → EXP → level up → spend stat points** loop.
 
 ```bash
 npm install
