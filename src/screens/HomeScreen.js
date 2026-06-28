@@ -8,6 +8,7 @@ import { useStride } from "../state/StrideContext.js";
 import { useStepSource } from "../steps/useStepSource.js";
 import { unlockedHiddenClasses } from "../../engine/classes.js";
 import ProgressBar from "../components/ProgressBar.js";
+import Avatar from "../components/Avatar.js";
 import { colors, spacing } from "../theme.js";
 
 export default function HomeScreen({ onOpenStats, onOpenDungeon }) {
@@ -21,7 +22,7 @@ export default function HomeScreen({ onOpenStats, onOpenDungeon }) {
       {/* Avatar / identity */}
       <View style={[styles.card, styles.identityCard]}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarGlyph}>🧍</Text>
+          <Avatar classId={profile.classId} level={profile.level} size={64} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.className}>{profile.className}</Text>

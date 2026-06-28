@@ -17,8 +17,7 @@ import {
   applyFloorResult,
   deriveSheet,
 } from "../game/profile.js";
-import { autoPolicy } from "../game/combatPolicy.js";
-import { runFloor } from "../../engine/dungeon.js";
+import { createFloorSession } from "../../engine/dungeonSession.js";
 import { energyCost } from "../../engine/floors.js";
 import { createRng } from "../../engine/rng.js";
 
@@ -79,28 +78,31 @@ export function StrideProvider({ children }) {
     setProfile((p) => (p ? allocateStat(p, stat) : p));
   }, []);
 
-  // Run the current dungeon floor end-to-end with the shared auto-battle policy.
-  // Returns the full run (events + outcome) for the screen to render, and folds
-  // the rewards/penalty back into the profile. Returns null if too little Energy.
-  const runDungeonFloor = useCallback(() => {
+  // Start an interactive dungeon floor. Returns a session controller (see
+  // engine/dungeonSession.js) the screen drives turn by turn, or null if there
+  // isn't enough Energy. Rewards are applied later via commitFloorResult.
+  const beginFloorSession = useCallback(() => {
     const p = profileRef.current;
     if (!p) return null;
     const floor = p.floor || 1;
     if (p.energy < energyCost(floor)) return null;
-
-    const result = runFloor({
+    return createFloorSession({
       floor,
       stats: p.stats,
       skills: p.skills,
-      choose: autoPolicy,
-      rng: createRng(),
-      energy: p.energy,
       level: p.level,
+      rng: createRng(),
     });
+  }, []);
 
+  // Fold a finished floor's result back into the profile. Returns the level-ups
+  // gained so the screen can celebrate them.
+  const commitFloorResult = useCallback((result) => {
+    const p = profileRef.current;
+    if (!p) return [];
     const { profile: next, levelsGained } = applyFloorResult(p, result);
     setProfile(next);
-    return { ...result, floor, levelsGained };
+    return levelsGained;
   }, []);
 
   const value = {
@@ -112,7 +114,8 @@ export function StrideProvider({ children }) {
     resetGame,
     ingestSteps,
     spendStatPoint,
-    runDungeonFloor,
+    beginFloorSession,
+    commitFloorResult,
     floorCost: profile ? energyCost(profile.floor || 1) : 0,
   };
 

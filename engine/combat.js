@@ -1,6 +1,12 @@
 // Pure turn-based combat engine. No graphics, no I/O.
-// Returns a result object AND a list of events. A UI (text or graphical)
-// renders the events — the engine itself never prints.
+// Two ways to drive it:
+//   • createBattle(...) — a steppable controller that pauses for the player's
+//     action each turn (used by the interactive in-app dungeon).
+//   • runBattle(...)    — auto-resolves a whole battle with a choose() policy
+//     (used by the text sim and the balance harness). It's a thin wrapper over
+//     createBattle, so both paths share one rulebook.
+//
+// A UI renders the emitted events — the engine itself never prints.
 
 import { derive } from "./stats.js";
 import { SKILLS } from "./skills.js";
@@ -27,17 +33,14 @@ const isAlive = (c) => c.hp > 0;
 
 // Core damage application — shared by attacks and skills.
 function dealDamage(rng, attacker, target, rawAmount, type, opts = {}) {
-  // Dodge (skip for AoE-ish raw guarantees if needed; here always checks)
   const dodge = derive.dodgeChance(target.stats);
   if (rng.chance(dodge)) {
     return { type: "dodge", attacker: attacker.name, target: target.name };
   }
   let amount = rawAmount;
-  // Crit
   const crit = derive.critChance(attacker.stats) + (opts.critBonus || 0);
   const isCrit = rng.chance(crit);
   if (isCrit) amount *= derive.critMult();
-  // Guard halves
   if (target.guard) amount *= 0.5;
   amount = Math.max(1, Math.round(amount));
   target.hp = Math.max(0, target.hp - amount);
@@ -67,85 +70,6 @@ function enemyAction(rng, enemy, players) {
   return dealDamage(rng, enemy, target, derive.attack(enemy.stats), "physical");
 }
 
-// `choose(player, enemies, rng)` is a policy that returns an action:
-//   { kind: "attack", targetIndex }
-//   { kind: "skill", skillId, targetIndex }
-//   { kind: "flee" }
-// In a real UI, this is the player's menu selection. In sims, it's an AI.
-export function runBattle({ player, enemies, choose, rng = createRng(), maxRounds = 100 }) {
-  const events = [];
-  const emit = (e) => { events.push(e); return e; };
-  emit({ type: "battleStart", enemies: enemies.map((e) => e.name) });
-
-  let round = 0;
-  while (isAlive(player) && enemies.some(isAlive) && round < maxRounds) {
-    round++;
-    emit({ type: "round", round });
-
-    // Turn order by speed (AGI). Player + enemies interleaved.
-    const order = [player, ...enemies]
-      .filter(isAlive)
-      .sort((a, b) => derive.speed(b.stats) - derive.speed(a.stats));
-
-    for (const actor of order) {
-      if (!isAlive(actor) || !isAlive(player) || !enemies.some(isAlive)) continue;
-
-      if (actor.stunned) {
-        actor.stunned = false;
-        emit({ type: "stunnedSkip", actor: actor.name });
-        continue;
-      }
-
-      if (actor.isPlayer) {
-        actor.guard = false; // guard only lasts until your next turn
-        const action = choose(player, enemies, rng) || { kind: "attack", targetIndex: firstAlive(enemies) };
-
-        if (action.kind === "flee") {
-          if (rng.chance(derive.fleeChance(player.stats))) {
-            emit({ type: "flee", success: true });
-            return finish(events, "fled", player, enemies);
-          }
-          emit({ type: "flee", success: false });
-          continue;
-        }
-
-        if (action.kind === "skill") {
-          const skill = SKILLS[action.skillId];
-          if (!skill) { emit({ type: "error", msg: `no skill ${action.skillId}` }); continue; }
-          if (player.mp < skill.cost) {
-            // fall back to a basic attack if out of MP
-            emit({ type: "outOfMp", skill: skill.name });
-            basicAttack(rng, player, enemies, action.targetIndex, emit);
-            continue;
-          }
-          player.mp -= skill.cost;
-          emit({ type: "skill", actor: player.name, skill: skill.name, cost: skill.cost });
-          const targets = resolveTargets(skill.target, player, enemies, action.targetIndex);
-          const ctx = {
-            user: player, targets, rng,
-            dealDamage: (u, t, amt, ty, o) => dealDamage(rng, u, t, amt, ty, o),
-            heal,
-          };
-          for (const ev of skill.effect(ctx)) emit(ev);
-          continue;
-        }
-
-        // default: attack
-        basicAttack(rng, player, enemies, action.targetIndex, emit);
-      } else {
-        // enemy turn
-        actor.guard = false;
-        const ev = enemyAction(rng, actor, [player]);
-        if (ev) emit(ev);
-      }
-    }
-  }
-
-  if (!isAlive(player)) return finish(events, "defeat", player, enemies);
-  if (!enemies.some(isAlive)) return finish(events, "victory", player, enemies);
-  return finish(events, "timeout", player, enemies);
-}
-
 function firstAlive(enemies) {
   const i = enemies.findIndex(isAlive);
   return i === -1 ? 0 : i;
@@ -166,14 +90,152 @@ function resolveTargets(targetType, player, enemies, targetIndex) {
   return [enemies[idx]].filter(Boolean);
 }
 
-function finish(events, outcome, player, enemies) {
-  events.push({ type: "battleEnd", outcome });
+// Apply one player action, emitting events. Returns "fled" if a flee succeeded.
+function performPlayerAction(rng, player, enemies, action, emit) {
+  if (action.kind === "flee") {
+    if (rng.chance(derive.fleeChance(player.stats))) {
+      emit({ type: "flee", success: true });
+      return "fled";
+    }
+    emit({ type: "flee", success: false });
+    return null;
+  }
+
+  if (action.kind === "skill") {
+    const skill = SKILLS[action.skillId];
+    if (!skill) {
+      emit({ type: "error", msg: `no skill ${action.skillId}` });
+      return null;
+    }
+    if (player.mp < skill.cost) {
+      emit({ type: "outOfMp", skill: skill.name });
+      basicAttack(rng, player, enemies, action.targetIndex, emit);
+      return null;
+    }
+    player.mp -= skill.cost;
+    emit({ type: "skill", actor: player.name, skill: skill.name, cost: skill.cost });
+    const targets = resolveTargets(skill.target, player, enemies, action.targetIndex);
+    const ctx = {
+      user: player,
+      targets,
+      rng,
+      dealDamage: (u, t, amt, ty, o) => dealDamage(rng, u, t, amt, ty, o),
+      heal,
+    };
+    for (const ev of skill.effect(ctx)) emit(ev);
+    return null;
+  }
+
+  // default: basic attack
+  basicAttack(rng, player, enemies, action.targetIndex, emit);
+  return null;
+}
+
+// ── Steppable battle controller ────────────────────────────────
+// advance() processes turns until it's the player's turn (returns awaiting:true)
+// or the battle ends. submit(action) applies the player's choice then advances.
+// All emitted events accumulate in `log`; each call also returns just the new
+// events so a UI can append incrementally.
+export function createBattle({ player, enemies, rng = createRng(), maxRounds = 100 }) {
+  const log = [];
+  let round = 0;
+  let queue = [];
+  let outcome = null;
+  let started = false;
+
+  const enemiesAlive = () => enemies.some(isAlive);
+
+  function advance() {
+    const fresh = [];
+    const emit = (e) => { log.push(e); fresh.push(e); return e; };
+
+    if (!started) {
+      started = true;
+      emit({ type: "battleStart", enemies: enemies.map((e) => e.name) });
+    }
+
+    while (true) {
+      if (!isAlive(player)) { outcome = "defeat"; emit({ type: "battleEnd", outcome }); break; }
+      if (!enemiesAlive()) { outcome = "victory"; emit({ type: "battleEnd", outcome }); break; }
+      if (round >= maxRounds) { outcome = "timeout"; emit({ type: "battleEnd", outcome }); break; }
+
+      if (queue.length === 0) {
+        round++;
+        emit({ type: "round", round });
+        queue = [player, ...enemies]
+          .filter(isAlive)
+          .sort((a, b) => derive.speed(b.stats) - derive.speed(a.stats));
+      }
+
+      const actor = queue.shift();
+      if (!actor || !isAlive(actor)) continue;
+      if (actor.stunned) {
+        actor.stunned = false;
+        emit({ type: "stunnedSkip", actor: actor.name });
+        continue;
+      }
+
+      if (actor.isPlayer) {
+        actor.guard = false; // guard only lasts until your next turn
+        return { events: fresh, awaiting: true, outcome: null };
+      }
+
+      actor.guard = false;
+      const ev = enemyAction(rng, actor, [player]);
+      if (ev) emit(ev);
+    }
+
+    return { events: fresh, awaiting: false, outcome };
+  }
+
+  function submit(action) {
+    const fresh = [];
+    const emit = (e) => { log.push(e); fresh.push(e); return e; };
+
+    const act = action || { kind: "attack", targetIndex: firstAlive(enemies) };
+    const res = performPlayerAction(rng, player, enemies, act, emit);
+    if (res === "fled") {
+      outcome = "fled";
+      emit({ type: "battleEnd", outcome });
+      return { events: fresh, awaiting: false, outcome };
+    }
+
+    const cont = advance();
+    return { events: [...fresh, ...cont.events], awaiting: cont.awaiting, outcome: cont.outcome };
+  }
+
+  function result() {
+    return {
+      outcome,
+      events: log,
+      playerHp: player.hp,
+      playerMp: player.mp,
+      xp: outcome === "victory" ? enemies.reduce((s, e) => s + (e.xp || 0), 0) : 0,
+      gold: outcome === "victory" ? enemies.reduce((s, e) => s + (e.gold || 0), 0) : 0,
+    };
+  }
+
   return {
-    outcome, // "victory" | "defeat" | "fled" | "timeout"
-    events,
-    playerHp: player.hp,
-    playerMp: player.mp,
-    xp: outcome === "victory" ? enemies.reduce((s, e) => s + (e.xp || 0), 0) : 0,
-    gold: outcome === "victory" ? enemies.reduce((s, e) => s + (e.gold || 0), 0) : 0,
+    player,
+    enemies,
+    advance,
+    submit,
+    result,
+    get outcome() { return outcome; },
+    get log() { return log; },
   };
+}
+
+// `choose(player, enemies, rng)` is a policy returning an action:
+//   { kind: "attack", targetIndex }
+//   { kind: "skill", skillId, targetIndex }
+//   { kind: "flee" }
+// Auto-resolves the whole battle (sim/balance path).
+export function runBattle({ player, enemies, choose, rng = createRng(), maxRounds = 100 }) {
+  const battle = createBattle({ player, enemies, rng, maxRounds });
+  let step = battle.advance();
+  while (step.awaiting) {
+    step = battle.submit(choose(player, enemies, rng));
+  }
+  return battle.result();
 }
