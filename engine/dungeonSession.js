@@ -23,7 +23,7 @@ function betweenWaveRecovery(player) {
 
 // Returns a controller: snapshot() for the current view, and act()/attack()/
 // skill()/flee() to take the player's turn. Non-combat floors resolve instantly.
-export function createFloorSession({ floor, stats, skills, skillLevels = {}, primaryStat = "STR", weaponTypes = null, startHP = null, startMP = null, level = 1, rng = createRng() }) {
+export function createFloorSession({ floor, stats, skills, skillLevels = {}, primaryStat = "STR", weaponTypes = null, classId = "knight", startHP = null, startMP = null, level = 1, rng = createRng() }) {
   const cost = energyCost(floor);
   const { type, waves } = buildWaves(floor, rng);
   const player = makeCombatant({ name: "You", stats, skills, skillLevels, primaryStat, isPlayer: true, bonusHP: levelHpBonus(level) });
@@ -43,7 +43,7 @@ export function createFloorSession({ floor, stats, skills, skillLevels = {}, pri
 
   function finishFloor(outcome, xp, gold) {
     // Loot + materials only drop on a clear; magic find uses the player's Luck.
-    const loot = outcome === "cleared" ? rollLoot(type, floor, stats.LUK || 0, rng, weaponTypes) : [];
+    const loot = outcome === "cleared" ? rollLoot(type, floor, stats.LUK || 0, rng, { classId, weaponTypes }) : [];
     const materials = outcome === "cleared" ? rollMaterials(type, floor, stats.LUK || 0, rng) : {};
     result = { outcome, xp, gold, energySpent: cost, wavesCleared, floor, loot, materials, finalHp: player.hp, finalMp: player.mp };
     phase = outcome === "cleared" ? "won" : outcome === "defeat" ? "lost" : "fled";

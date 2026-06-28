@@ -1,14 +1,18 @@
-// Loot: equippable items that drop in the dungeon. Each item has a rarity (which
-// scales its bonus), a slot (weapon / armor / accessory), and 1-3 stat bonuses
-// that fold into combat stats when equipped. Drop quality rises with floor depth
-// and the player's Luck ("magic find").
+// Loot: equippable items that drop in the dungeon. Gear is generated themed to
+// the player's class — class-named (e.g. "Rogue Gloves"), with a class-specific
+// main stat per slot — so every drop is recognisably for you. Rarity scales the
+// bonuses; depth + Luck ("magic find") tilt the odds.
 
 import { STATS } from "./stats.js";
 
-export const SLOTS = ["weapon", "armor", "accessory"];
+// Equip slots, grouped into UI categories.
+export const SLOTS = ["weapon", "subweapon", "helm", "armor", "gloves", "boots", "accessory"];
+export const CATEGORIES = [
+  { id: "weapon", name: "Weapons", slots: ["weapon", "subweapon"] },
+  { id: "armor", name: "Armor", slots: ["helm", "armor", "gloves", "boots"] },
+  { id: "accessory", name: "Accessories", slots: ["accessory"] },
+];
 
-// Skewed hard toward common; legendary is exceptionally scarce, so a good drop
-// feels like a real achievement.
 export const RARITIES = {
   common:    { id: "common", name: "Common", mult: 1.0, stats: 1, weight: 72, color: "#9aa7b4" },
   uncommon:  { id: "uncommon", name: "Uncommon", mult: 1.6, stats: 2, weight: 20, color: "#5ad1a0" },
@@ -16,33 +20,45 @@ export const RARITIES = {
   epic:      { id: "epic", name: "Epic", mult: 3.8, stats: 3, weight: 1.8, color: "#c792ea" },
   legendary: { id: "legendary", name: "Legendary", mult: 5.5, stats: 3, weight: 0.2, color: "#e3b341" },
 };
-
 export const RARITY_ORDER = ["common", "uncommon", "rare", "epic", "legendary"];
 
-// Weapon TYPES (also a weapon's base noun). Jobs restrict which a class may use.
+// Weapon TYPES (a weapon's base noun). Jobs restrict which a class may use.
 export const WEAPON_TYPES = [
   "Sword", "Greatsword", "Mace", "Spear", "Hammer", "Staff",
   "Wand", "Bow", "Crossbow", "Dagger", "Fist", "Scepter",
 ];
 
-// Base item names per slot (a random one is chosen for flavor).
-const SLOT_NAMES = {
-  weapon: WEAPON_TYPES,
-  armor: ["Mail", "Plate", "Robe", "Hauberk", "Cuirass", "Garb"],
-  accessory: ["Ring", "Amulet", "Charm", "Band", "Talisman", "Pendant"],
+// Per-class gear flavour: the set name shown on every piece + the class's
+// sub-weapon type.
+export const CLASS_GEAR = {
+  knight:   { set: "Vanguard", sub: "Shield" },
+  sentinel: { set: "Bulwark", sub: "Greatshield" },
+  monk:     { set: "Ascetic", sub: "Talisman" },
+  ranger:   { set: "Rogue", sub: "Quiver" },
+  scholar:  { set: "Sage", sub: "Tome" },
+  herald:   { set: "Regal", sub: "Banner" },
 };
 
-// Chance that clearing a floor of this type drops an item at all — low, so most
-// floors give none. Bosses are the reliable source.
+// Per-class main stat for each slot, so each piece has a distinct, class-fitting
+// role (e.g. gloves = the class's "attack/cast" stat).
+export const CLASS_FOCUS = {
+  knight:   { weapon: "STR", subweapon: "STR", helm: "VIT", armor: "VIT", gloves: "STR", boots: "END", accessory: "LUK" },
+  sentinel: { weapon: "VIT", subweapon: "VIT", helm: "END", armor: "VIT", gloves: "VIT", boots: "END", accessory: "CHA" },
+  monk:     { weapon: "END", subweapon: "END", helm: "VIT", armor: "END", gloves: "END", boots: "AGI", accessory: "LUK" },
+  ranger:   { weapon: "AGI", subweapon: "AGI", helm: "END", armor: "VIT", gloves: "AGI", boots: "AGI", accessory: "LUK" },
+  scholar:  { weapon: "INT", subweapon: "INT", helm: "INT", armor: "VIT", gloves: "INT", boots: "AGI", accessory: "LUK" },
+  herald:   { weapon: "CHA", subweapon: "CHA", helm: "VIT", armor: "VIT", gloves: "CHA", boots: "AGI", accessory: "LUK" },
+};
+
+const SLOT_NOUN = { helm: "Helm", armor: "Armor", gloves: "Gloves", boots: "Boots" };
+const ACCESSORY_NAMES = ["Ring", "Amulet", "Charm", "Band", "Pendant"];
+
 export function dropChance(floorType) {
   return { combat: 0.15, elite: 0.35, boss: 1.0, treasure: 0.6 }[floorType] || 0;
 }
 
-// Weighted rarity roll, shifted toward rarer tiers by depth + Luck ("magic
-// find") plus a per-source bonus (bosses/elites yield better quality). Kept
-// gentle so legendary stays scarce even deep and lucky.
 function rollRarity(rng, floor, luck, bonusFind = 0) {
-  const find = floor * 0.3 + luck * 0.2 + bonusFind; // percentage-point shift
+  const find = floor * 0.3 + luck * 0.2 + bonusFind;
   const weights = {
     common: Math.max(8, RARITIES.common.weight - find),
     uncommon: RARITIES.uncommon.weight + find * 0.55,
@@ -65,47 +81,62 @@ function uid() {
   return `it_${Date.now().toString(36)}_${counter}_${Math.floor(Math.random() * 1e6).toString(36)}`;
 }
 
-// Generate one item appropriate to a floor (item level ≈ floor). bonusFind
-// raises quality; weaponTypes (if given) restricts weapon drops to types the
-// player can actually use, so loot stays usable.
-export function generateItem(floor, luck, rng, bonusFind = 0, weaponTypes = null) {
+// Generate one class-themed item for a floor. opts: { classId, weaponTypes,
+// bonusFind }. weaponTypes restricts weapon drops to usable types.
+export function generateItem(floor, luck, rng, opts = {}) {
+  const { classId = "knight", weaponTypes = null, bonusFind = 0 } = opts;
   const rarityId = rollRarity(rng, floor, luck, bonusFind);
   const rarity = RARITIES[rarityId];
   const slot = rng.pick(SLOTS);
+  const gear = CLASS_GEAR[classId] || CLASS_GEAR.knight;
+  const focus = (CLASS_FOCUS[classId] || CLASS_FOCUS.knight)[slot];
 
-  // Per-stat magnitude scales with depth and rarity. Tunable.
   const base = 2 + Math.floor(floor * 0.4);
-  const pool = [...STATS];
   const mods = {};
-  for (let i = 0; i < rarity.stats && pool.length; i++) {
+  // Main stat = the slot's class focus (the bigger bonus).
+  mods[focus] = Math.max(1, Math.round(base * rarity.mult * (0.9 + rng.next() * 0.3)));
+  // Extra stats by rarity, smaller, from the remaining pool.
+  const pool = STATS.filter((s) => s !== focus);
+  for (let i = 0; i < rarity.stats - 1 && pool.length; i++) {
     const idx = Math.floor(rng.next() * pool.length);
-    const stat = pool.splice(idx, 1)[0];
-    const v = Math.max(1, Math.round(base * rarity.mult * (0.8 + rng.next() * 0.4)));
-    mods[stat] = v;
+    const st = pool.splice(idx, 1)[0];
+    mods[st] = Math.max(1, Math.round(base * rarity.mult * 0.55 * (0.8 + rng.next() * 0.4)));
   }
 
-  const namePool = slot === "weapon" && weaponTypes && weaponTypes.length ? weaponTypes : SLOT_NAMES[slot];
-  const baseName = rng.pick(namePool);
+  let noun, weaponType, subType;
+  if (slot === "weapon") {
+    const wpool = weaponTypes && weaponTypes.length ? weaponTypes : WEAPON_TYPES;
+    weaponType = rng.pick(wpool);
+    noun = weaponType;
+  } else if (slot === "subweapon") {
+    subType = gear.sub;
+    noun = subType;
+  } else if (slot === "accessory") {
+    noun = rng.pick(ACCESSORY_NAMES);
+  } else {
+    noun = SLOT_NOUN[slot];
+  }
+
   const item = {
     id: uid(),
     slot,
     rarity: rarityId,
-    base: baseName, // slot base noun, kept so rarity crafting can rename cleanly
-    name: `${rarity.name} ${baseName}`,
-    level: floor, // item level ≈ floor found (sets stat magnitude)
-    upgrade: 0, // +0..+30 enhancement level
-    mods, // BASE stat bonuses; scaled by upgrade via itemMods()
+    forClass: classId,
+    base: noun, // noun kept so rarity crafting can rename cleanly
+    name: `${rarity.name} ${gear.set} ${noun}`,
+    level: floor,
+    upgrade: 0,
+    mods,
   };
-  if (slot === "weapon") item.weaponType = baseName;
+  if (weaponType) item.weaponType = weaponType;
+  if (subType) item.subType = subType;
   return item;
 }
 
-// Enhancement multiplier: +4% of base stats per upgrade level (so +30 ≈ ×2.2).
 export function itemPower(item) {
   return 1 + 0.04 * (item.upgrade || 0);
 }
 
-// An item's effective stat bonuses after its upgrade level.
 export function itemMods(item) {
   const f = itemPower(item);
   const out = {};
@@ -113,17 +144,17 @@ export function itemMods(item) {
   return out;
 }
 
-// Roll the loot dropped by clearing a floor (at most one item). Bosses and
-// elites grant a quality bonus. weaponTypes restricts weapon drops to usable ones.
-export function rollLoot(floorType, floor, luck, rng, weaponTypes = null) {
+// Roll the loot from clearing a floor (at most one item). Bosses/elites grant a
+// quality bonus. opts threads { classId, weaponTypes }.
+export function rollLoot(floorType, floor, luck, rng, opts = {}) {
   const chance = dropChance(floorType);
   if (chance <= 0 || rng.next() >= chance) return [];
   const bonusFind = floorType === "boss" ? 22 : floorType === "elite" ? 8 : 0;
-  return [generateItem(floor, luck, rng, bonusFind, weaponTypes)];
+  return [generateItem(floor, luck, rng, { ...opts, bonusFind })];
 }
 
-// Total stat bonuses from a set of equipped items (an { slot: item } map),
-// including each item's upgrade level.
+// Total stat bonuses from all equipped items (an { slot: item } map), including
+// each item's upgrade level.
 export function equipmentMods(equipment = {}) {
   const total = {};
   for (const slot of SLOTS) {

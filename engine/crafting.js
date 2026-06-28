@@ -2,7 +2,7 @@
 // and materials that drop in the dungeon — higher-tier materials are far rarer
 // (mostly from bosses), so big upgrades and rarity jumps are a real investment.
 
-import { RARITIES, RARITY_ORDER, SLOTS } from "./items.js";
+import { RARITIES, RARITY_ORDER, SLOTS, CLASS_GEAR } from "./items.js";
 import { STATS } from "./stats.js";
 
 export const MAX_UPGRADE = 30;
@@ -96,7 +96,9 @@ export function withRarityUp(item, rng) {
     newMods[stat] = Math.max(1, Math.round(base * RARITIES[next].mult * (0.8 + rng.next() * 0.4)));
   }
   const baseName = item.base || item.name.split(" ").slice(-1)[0];
-  return { ...item, rarity: next, mods: newMods, name: `${RARITIES[next].name} ${baseName}` };
+  const set = (CLASS_GEAR[item.forClass] || {}).set;
+  const name = `${RARITIES[next].name} ${set ? set + " " : ""}${baseName}`;
+  return { ...item, rarity: next, mods: newMods, name };
 }
 
 // Helpers shared by the profile layer.

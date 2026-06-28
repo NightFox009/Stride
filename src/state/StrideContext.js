@@ -153,6 +153,7 @@ export function StrideProvider({ children }) {
       skillLevels: p.skillLevels || {},
       primaryStat: primaryStatOf(p),
       weaponTypes: allowedWeaponTypes(p),
+      classId: p.classId,
       startHP: v.hp,
       startMP: v.mp,
       level: p.level,

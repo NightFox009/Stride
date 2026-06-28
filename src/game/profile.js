@@ -52,7 +52,7 @@ export function createProfile(classId) {
     skillLevels: {}, // id -> rank, for learned tree skills/passives
     job: null, // awakened advanced job id (see engine/jobs.js)
     inventory: [], // unequipped items
-    equipment: { weapon: null, armor: null, accessory: null },
+    equipment: { weapon: null, subweapon: null, helm: null, armor: null, gloves: null, boots: null, accessory: null },
     materials: {}, // crafting materials: { matId: count }
     currentHP: null, // carried HP between floors (null = full)
     currentMP: null, // carried MP between floors (null = full)
@@ -291,23 +291,25 @@ export function craftItemRarity(profile, itemId, rng) {
   return mapItem(p, itemId, (it) => withRarityUp(it, rng));
 }
 
-// Weapon types this character may equip: a hidden Luck job can use any (null);
-// a normal job is locked to its weapon; before awakening, both class weapons.
+// Weapon types this character may equip. A normal job is locked to its one
+// weapon; a hidden Luck job or a not-yet-awakened character may use BOTH of the
+// class's weapon types (but no others).
 export function allowedWeaponTypes(profile) {
   const job = getJob(profile.job);
-  if (job && job.hidden) return null; // any weapon
-  if (job && job.weapon) return [job.weapon];
+  if (job && !job.hidden && job.weapon) return [job.weapon];
   return classWeaponTypes(profile.classId);
 }
 
-// Can this character equip the given item? Only weapons are restricted.
+// Can this character equip the given item? Gear is class-specific; weapons are
+// further limited to the character's allowed weapon types.
 export function canEquipItem(profile, item) {
-  if (!item || item.slot !== "weapon") return true;
-  const allowed = allowedWeaponTypes(profile);
-  if (!allowed) return true; // any
-  const wt = item.weaponType || item.base;
-  if (!wt) return true; // legacy item without a type — allow
-  return allowed.includes(wt);
+  if (!item) return false;
+  if (item.forClass && item.forClass !== profile.classId) return false; // another class's gear
+  if (item.slot === "weapon") {
+    const wt = item.weaponType || item.base;
+    if (wt && !allowedWeaponTypes(profile).includes(wt)) return false;
+  }
+  return true;
 }
 
 // Equip an item from the inventory; any item already in that slot returns to
