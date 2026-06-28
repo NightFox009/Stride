@@ -17,7 +17,7 @@ export const RARITIES = {
   legendary: { id: "legendary", name: "Legendary", mult: 5.5, stats: 3, weight: 0.2, color: "#e3b341" },
 };
 
-const RARITY_ORDER = ["common", "uncommon", "rare", "epic", "legendary"];
+export const RARITY_ORDER = ["common", "uncommon", "rare", "epic", "legendary"];
 
 // Base item names per slot (a random one is chosen for flavor).
 const SLOT_NAMES = {
@@ -82,10 +82,25 @@ export function generateItem(floor, luck, rng, bonusFind = 0) {
     id: uid(),
     slot,
     rarity: rarityId,
+    base: baseName, // slot base noun, kept so rarity crafting can rename cleanly
     name: `${rarity.name} ${baseName}`,
-    level: floor,
-    mods,
+    level: floor, // item level ≈ floor found (sets stat magnitude)
+    upgrade: 0, // +0..+30 enhancement level
+    mods, // BASE stat bonuses; scaled by upgrade via itemMods()
   };
+}
+
+// Enhancement multiplier: +4% of base stats per upgrade level (so +30 ≈ ×2.2).
+export function itemPower(item) {
+  return 1 + 0.04 * (item.upgrade || 0);
+}
+
+// An item's effective stat bonuses after its upgrade level.
+export function itemMods(item) {
+  const f = itemPower(item);
+  const out = {};
+  for (const [k, v] of Object.entries(item.mods || {})) out[k] = Math.round(v * f);
+  return out;
 }
 
 // Roll the loot dropped by clearing a floor (at most one item). Bosses and
@@ -97,12 +112,13 @@ export function rollLoot(floorType, floor, luck, rng) {
   return [generateItem(floor, luck, rng, bonusFind)];
 }
 
-// Total stat bonuses from a set of equipped items (an { slot: item } map).
+// Total stat bonuses from a set of equipped items (an { slot: item } map),
+// including each item's upgrade level.
 export function equipmentMods(equipment = {}) {
   const total = {};
   for (const slot of SLOTS) {
     const it = equipment[slot];
-    if (it && it.mods) for (const [k, v] of Object.entries(it.mods)) total[k] = (total[k] || 0) + v;
+    if (it) for (const [k, v] of Object.entries(itemMods(it))) total[k] = (total[k] || 0) + v;
   }
   return total;
 }

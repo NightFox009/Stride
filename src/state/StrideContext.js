@@ -22,6 +22,8 @@ import {
   equipItem,
   unequipItem,
   sellItem,
+  upgradeItem,
+  craftItemRarity,
   deriveSheet,
   combatStats,
   primaryStatOf,
@@ -122,6 +124,12 @@ export function StrideProvider({ children }) {
   const sell = useCallback((itemId) => {
     setProfile((p) => (p ? sellItem(p, itemId) : p));
   }, []);
+  const upgrade = useCallback((itemId) => {
+    setProfile((p) => (p ? upgradeItem(p, itemId) : p));
+  }, []);
+  const craft = useCallback((itemId) => {
+    setProfile((p) => (p ? craftItemRarity(p, itemId, createRng()) : p));
+  }, []);
 
   // Start an interactive dungeon floor. Returns a session controller (see
   // engine/dungeonSession.js) the screen drives turn by turn, or null if there
@@ -170,6 +178,8 @@ export function StrideProvider({ children }) {
     equip,
     unequip,
     sell,
+    upgrade,
+    craft,
     beginFloorSession,
     commitFloorResult,
     floorCost: profile ? energyCost(profile.floor || 1) : 0,

@@ -9,6 +9,7 @@ import { derive } from "./stats.js";
 import { SKILLS } from "./skills.js";
 import { TUNING, levelHpBonus } from "./progression.js";
 import { rollLoot } from "./items.js";
+import { rollMaterials } from "./crafting.js";
 import { createRng } from "./rng.js";
 
 // Same small between-wave recovery as the auto runner.
@@ -38,9 +39,10 @@ export function createFloorSession({ floor, stats, skills, skillLevels = {}, pri
   let totalXp = 0, totalGold = 0, wavesCleared = 0;
 
   function finishFloor(outcome, xp, gold) {
-    // Loot only drops on a clear; magic find uses the player's Luck.
+    // Loot + materials only drop on a clear; magic find uses the player's Luck.
     const loot = outcome === "cleared" ? rollLoot(type, floor, stats.LUK || 0, rng) : [];
-    result = { outcome, xp, gold, energySpent: cost, wavesCleared, floor, loot };
+    const materials = outcome === "cleared" ? rollMaterials(type, floor, stats.LUK || 0, rng) : {};
+    result = { outcome, xp, gold, energySpent: cost, wavesCleared, floor, loot, materials };
     phase = outcome === "cleared" ? "won" : outcome === "defeat" ? "lost" : "fled";
   }
 

@@ -9,6 +9,13 @@ import { effectiveStats, treeFor, maxLevelFor, rankLevelReq } from "../../engine
 import { getJob, jobsFor, JOB_LEVEL } from "../../engine/jobs.js";
 import { equipmentMods, SLOTS } from "../../engine/items.js";
 import {
+  upgradeCost,
+  rarityUpgradeCost,
+  withUpgrade,
+  withRarityUp,
+  hasMaterials,
+} from "../../engine/crafting.js";
+import {
   gainExp as engineGainExp,
   stepsToXP,
   stepsToEnergy,
@@ -44,6 +51,7 @@ export function createProfile(classId) {
     job: null, // awakened advanced job id (see engine/jobs.js)
     inventory: [], // unequipped items
     equipment: { weapon: null, armor: null, accessory: null },
+    materials: {}, // crafting materials: { matId: count }
     energy: BASE_ENERGY,
     gold: 0,
     // Deepest floor not yet cleared — the dungeon's "current floor".
@@ -210,8 +218,61 @@ export function applyFloorResult(profile, result) {
   if (result.loot && result.loot.length) {
     p.inventory = [...(p.inventory || []), ...result.loot];
   }
+  // Crafting materials get added to the stash.
+  if (result.materials && Object.keys(result.materials).length) {
+    const m = { ...(p.materials || {}) };
+    for (const [k, q] of Object.entries(result.materials)) m[k] = (m[k] || 0) + q;
+    p.materials = m;
+  }
 
   return { profile: p, levelsGained };
+}
+
+// Find an item by id across inventory and equipped slots.
+function findItem(profile, itemId) {
+  return (
+    (profile.inventory || []).find((i) => i.id === itemId) ||
+    Object.values(profile.equipment || {}).find((i) => i && i.id === itemId) ||
+    null
+  );
+}
+
+// Apply fn() to the item with itemId wherever it lives (inventory or a slot).
+function mapItem(profile, itemId, fn) {
+  const inventory = (profile.inventory || []).map((i) => (i.id === itemId ? fn(i) : i));
+  const equipment = { ...(profile.equipment || {}) };
+  for (const slot of Object.keys(equipment)) {
+    if (equipment[slot] && equipment[slot].id === itemId) equipment[slot] = fn(equipment[slot]);
+  }
+  return { ...profile, inventory, equipment };
+}
+
+function spendResources(profile, gold, mats) {
+  const m = { ...(profile.materials || {}) };
+  for (const [k, q] of Object.entries(mats || {})) m[k] = (m[k] || 0) - q;
+  return { ...profile, gold: (profile.gold || 0) - gold, materials: m };
+}
+
+// Enhance an item one upgrade level if the player can pay the cost.
+export function upgradeItem(profile, itemId) {
+  const item = findItem(profile, itemId);
+  if (!item) return profile;
+  const cost = upgradeCost(item);
+  if (!cost) return profile; // maxed
+  if ((profile.gold || 0) < cost.gold || !hasMaterials(profile.materials, cost.mats)) return profile;
+  let p = spendResources(profile, cost.gold, cost.mats);
+  return mapItem(p, itemId, (it) => withUpgrade(it));
+}
+
+// Craft an item up to the next rarity (keeps stats, adds one), if affordable.
+export function craftItemRarity(profile, itemId, rng) {
+  const item = findItem(profile, itemId);
+  if (!item) return profile;
+  const cost = rarityUpgradeCost(item);
+  if (!cost) return profile; // already legendary
+  if ((profile.gold || 0) < cost.gold || !hasMaterials(profile.materials, cost.mats)) return profile;
+  let p = spendResources(profile, cost.gold, cost.mats);
+  return mapItem(p, itemId, (it) => withRarityUp(it, rng));
 }
 
 // Equip an item from the inventory; any item already in that slot returns to

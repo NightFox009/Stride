@@ -9,6 +9,7 @@ import { useStride } from "../state/StrideContext.js";
 import { floorType } from "../../engine/floors.js";
 import { zoneName } from "../../engine/zones.js";
 import { RARITIES } from "../../engine/items.js";
+import { MATERIALS } from "../../engine/crafting.js";
 import ProgressBar from "../components/ProgressBar.js";
 import { colors, spacing } from "../theme.js";
 
@@ -177,6 +178,11 @@ export default function DungeonScreen({ onBack }) {
               ))}
             </View>
           )}
+          {r.materials && Object.keys(r.materials).length > 0 && (
+            <Text style={styles.mats}>
+              Materials: {Object.entries(r.materials).map(([k, q]) => `${q}× ${MATERIALS[k]?.name}`).join(", ")}
+            </Text>
+          )}
           <Pressable onPress={leave} style={({ pressed }) => [styles.descend, pressed && styles.pressed, { backgroundColor: colors.accent, marginTop: spacing(2) }]}>
             <Text style={[styles.descendText, { color: colors.bg }]}>Return</Text>
           </Pressable>
@@ -326,6 +332,7 @@ const styles = StyleSheet.create({
   loot: { marginTop: spacing(1.5), borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing(1) },
   lootTitle: { color: colors.text, fontSize: 14, fontWeight: "800", marginBottom: spacing(0.5) },
   lootItem: { fontSize: 13, fontWeight: "700", lineHeight: 19 },
+  mats: { color: colors.textDim, fontSize: 12, marginTop: spacing(0.5) },
   sectionTitle: { color: colors.textDim, fontSize: 12, fontWeight: "700", marginBottom: spacing(1), textTransform: "uppercase" },
   enemyRow: {
     flexDirection: "row", alignItems: "center", paddingVertical: spacing(0.75),
