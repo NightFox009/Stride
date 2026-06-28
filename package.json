@@ -1,0 +1,10 @@
+{
+  "name": "stride-engine",
+  "version": "0.1.0",
+  "description": "Stride — pure game-logic engine (text-first, ports to React Native).",
+  "type": "module",
+  "scripts": {
+    "sim": "node sim.js"
+  },
+  "license": "UNLICENSED"
+}
