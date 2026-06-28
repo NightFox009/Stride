@@ -5,9 +5,8 @@
 // A graphical UI (V2) would consume the SAME events and draw instead.
 
 import { startingStatsFor, BASE_CLASSES, unlockedHiddenClasses } from "./engine/classes.js";
-import { makeCombatant, runBattle } from "./engine/combat.js";
-import { buildWaves, floorType, energyCost } from "./engine/floors.js";
-import { spawn } from "./engine/enemies.js";
+import { runFloor } from "./engine/dungeon.js";
+import { floorType, energyCost } from "./engine/floors.js";
 import { SKILLS } from "./engine/skills.js";
 import { derive } from "./engine/stats.js";
 import { createRng } from "./engine/rng.js";
@@ -89,43 +88,68 @@ function render(events) {
       case "stunnedSkip": line(`    ${e.actor} is stunned and loses a turn.`); break;
       case "flee": line(`  Flee ${e.success ? "succeeded" : "failed"}.`); break;
       case "battleEnd": break;
+      // floor-level events
+      case "floorStart":
+        line(`  >> Floor ${e.floor} [${e.floorType}] — ${e.waves} wave(s), costs ${e.energyCost} Energy`);
+        break;
+      case "waveStart": line(`  === WAVE ${e.wave}/${e.of} ===`); break;
+      case "waveCleared":
+        line(`  Wave ${e.wave} cleared. +${e.xp} xp +${e.gold}g  ` +
+             `(HP ${e.playerHp}, MP ${e.playerMp})`);
+        break;
+      case "recover": line(`  ...recover +${e.hp} HP / +${e.mp} MP`); break;
+      case "floorCleared":
+        line(`  >> FLOOR CLEARED — raw ${e.rawXp} xp -> ${e.awardedXp} xp (dungeon rate), ${e.gold}g`);
+        break;
+      case "floorDefeat":
+        line(`  >> DEFEATED on wave ${e.wave}. Loot lost; EXP halved to ${e.xpHalvedTo}.`);
+        break;
+      case "floorFled": line(`  >> Fled floor ${e.floor} on wave ${e.wave}.`); break;
+      case "treasure": line(`  Treasure! +${e.gold} gold`); break;
+      case "rest": line(`  Rest floor — fully healed.`); break;
+      case "floorBlocked": line(`  Not enough Energy (need ${e.need}, have ${e.have}).`); break;
       default: break;
     }
   }
 }
 
-// ── Fight a single combat wave (wave 1 of floor 1) ─────────────
-line("DUNGEON — Floor 1");
-line(`  Type: ${floorType(1)}   Energy cost: ${energyCost(1)}`);
-const { waves } = buildWaves(1, rng);
-line(`  Waves this floor: ${waves.length}`);
+// ── Run a FULL floor (all 10 waves) ────────────────────────────
+const FLOOR = 1;
+line(`DUNGEON — Floor ${FLOOR}`);
+line(`  Type: ${floorType(FLOOR)}   Energy cost: ${energyCost(FLOOR)}   You have: ${profile.energy} Energy`);
 hr();
 
-line("Fighting Wave 1...");
-const player = makeCombatant({ name: "You (Knight)", stats, skills: playerSkills, isPlayer: true });
-const enemyDefs = waves[0];
-const enemyCombatants = enemyDefs.map((d) => {
-  const c = makeCombatant({ name: d.name, stats: d.stats });
-  c.xp = d.xp; c.gold = d.gold;
-  return c;
+const floorResult = runFloor({
+  floor: FLOOR,
+  stats,
+  skills: playerSkills,
+  choose: policy,
+  rng,
+  energy: profile.energy,
 });
-
-const result = runBattle({ player, enemies: enemyCombatants, choose: policy, rng });
-render(result.events);
+render(floorResult.events);
 hr();
-line(`Result: ${result.outcome.toUpperCase()}`);
-line(`  Player HP: ${result.playerHp}/${player.maxHP}   MP: ${result.playerMp}/${player.maxMP}`);
 
-if (result.outcome === "victory") {
-  const dungeonXp = Math.round(result.xp * TUNING.dungeonXpFactor);
-  line(`  Loot: +${dungeonXp} EXP (dungeon x${TUNING.dungeonXpFactor})  +${result.gold} gold`);
-  res = gainExp(profile, dungeonXp);
+line(`Floor result: ${floorResult.outcome.toUpperCase()}  ` +
+     `(${floorResult.wavesCleared} waves cleared)`);
+line(`  Final HP: ${floorResult.player.hp}/${floorResult.player.maxHP}   ` +
+     `MP: ${floorResult.player.mp}/${floorResult.player.maxMP}`);
+
+// Apply outcomes to the profile.
+profile.energy -= floorResult.energySpent;
+profile.gold += floorResult.gold;
+if (floorResult.xp > 0) {
+  res = gainExp(profile, floorResult.xp);
   profile = res.profile;
-  profile.gold += result.gold;
-} else if (result.outcome === "defeat") {
-  // Death penalty: lose loot, halve EXP earned that run, lose energy.
-  line("  DEFEAT penalty: loot lost, run EXP halved, energy spent is gone.");
+  for (const lv of res.levelsGained) {
+    line(`  *** LEVEL UP -> ${lv.level}!  +${lv.statPoints} stat points`);
+  }
 }
+if (floorResult.outcome === "defeat") {
+  line("  DEFEAT penalty applied: loot lost, run EXP halved, energy spent gone.");
+}
+line(`  Rewards: +${floorResult.xp} EXP  +${floorResult.gold} gold  ` +
+     `(-${floorResult.energySpent} Energy)`);
 line(`  Profile: Lv ${profile.level}  EXP ${profile.exp}/${expToNext(profile.level)}  ` +
      `Gold ${profile.gold}  Energy ${profile.energy}`);
 hr();
