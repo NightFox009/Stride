@@ -9,13 +9,15 @@ import { useStepSource } from "../steps/useStepSource.js";
 import { unlockedHiddenClasses } from "../../engine/classes.js";
 import ProgressBar from "../components/ProgressBar.js";
 import Avatar from "../components/Avatar.js";
+import { conversionPreview, MAX_ENERGY } from "../game/profile.js";
 import { colors, spacing } from "../theme.js";
 
 export default function HomeScreen({ onOpenStats, onOpenDungeon }) {
-  const { profile, sheet, ingestSteps, lastEarned, floorCost } = useStride();
+  const { profile, sheet, ingestSteps, convert, lastEarned, floorCost } = useStride();
   const { available, error, addManualSteps } = useStepSource(ingestSteps);
 
   const hidden = unlockedHiddenClasses(profile.stats);
+  const preview = conversionPreview(profile);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -43,7 +45,7 @@ export default function HomeScreen({ onOpenStats, onOpenDungeon }) {
       {/* Resource bars */}
       <View style={styles.card}>
         <ProgressBar label="EXP" value={profile.exp} max={sheet.expToNext} color={colors.exp} />
-        <ProgressBar label="Energy" value={profile.energy} color={colors.accent} suffix="⚡" />
+        <ProgressBar label="Energy" value={profile.energy} max={MAX_ENERGY} color={colors.accent} suffix="⚡" />
         <View style={styles.statRow}>
           <Stat k="Floor" v={profile.floor || 1} />
           <Stat k="Gold" v={profile.gold} />
@@ -64,20 +66,18 @@ export default function HomeScreen({ onOpenStats, onOpenDungeon }) {
         </Text>
       </Pressable>
 
-      {/* Step source status + dev walk controls */}
+      {/* Steps: bank + convert */}
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Steps</Text>
-        {available === null && <Text style={styles.dim}>Checking for a pedometer…</Text>}
+        <View style={styles.rowBetween}>
+          <Text style={styles.sectionTitle}>Steps</Text>
+          <Text style={styles.bankBig}>{preview.bank.toLocaleString()} banked</Text>
+        </View>
         {available === true && (
-          <Text style={styles.dim}>
-            📿 Pedometer connected — walk and your steps fuel EXP & Energy
-            automatically (10 steps = 1 EXP, 100 steps = 1 Energy).
-          </Text>
+          <Text style={styles.dim}>📿 Pedometer connected — your steps bank automatically.</Text>
         )}
         {available === false && (
           <Text style={styles.dim}>
-            No pedometer here{error ? ` (${error})` : ""}. Use the buttons below to
-            simulate walking.
+            No pedometer here{error ? ` (${error})` : ""}. Use the buttons below to simulate walking.
           </Text>
         )}
 
@@ -92,11 +92,32 @@ export default function HomeScreen({ onOpenStats, onOpenDungeon }) {
             </Pressable>
           ))}
         </View>
+
+        <Text style={styles.convertHint}>Convert banked steps — 10 = 1 EXP, 100 = 1⚡</Text>
+        <View style={styles.walkRow}>
+          <Pressable
+            disabled={preview.xp <= 0}
+            onPress={() => convert("exp")}
+            style={[styles.convertBtn, { borderColor: colors.exp }, preview.xp <= 0 && styles.convertOff]}
+          >
+            <Text style={[styles.convertText, { color: colors.exp }]}>→ EXP  +{preview.xp}</Text>
+          </Pressable>
+          <Pressable
+            disabled={preview.energy <= 0}
+            onPress={() => convert("energy")}
+            style={[styles.convertBtn, { borderColor: colors.accent }, preview.energy <= 0 && styles.convertOff]}
+          >
+            <Text style={[styles.convertText, { color: colors.accent }]}>→ Energy  +{preview.energy}⚡</Text>
+          </Pressable>
+        </View>
+        {profile.energy >= MAX_ENERGY && (
+          <Text style={styles.capNote}>Energy is full ({MAX_ENERGY}⚡). Convert steps to EXP instead.</Text>
+        )}
         {lastEarned && (
           <Text style={styles.earned}>
-            +{lastEarned.steps.toLocaleString()} steps → +{lastEarned.xp} EXP
-            {lastEarned.energy ? `, +${lastEarned.energy} ⚡` : ""}
-            {lastEarned.levelsGained.length
+            Converted {lastEarned.steps.toLocaleString()} steps →{" "}
+            {lastEarned.mode === "exp" ? `+${lastEarned.xp} EXP` : `+${lastEarned.energy}⚡`}
+            {lastEarned.levelsGained?.length
               ? `  •  LEVEL UP → ${lastEarned.levelsGained[lastEarned.levelsGained.length - 1].level}!`
               : ""}
           </Text>
@@ -168,6 +189,16 @@ const styles = StyleSheet.create({
   walkBtnPressed: { backgroundColor: colors.border },
   walkBtnText: { color: colors.accent, fontWeight: "700", fontSize: 14 },
   earned: { color: colors.accent, fontSize: 13, marginTop: spacing(1.5), fontWeight: "600" },
+  rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  bankBig: { color: colors.text, fontSize: 15, fontWeight: "800", marginBottom: spacing(1) },
+  convertHint: { color: colors.textDim, fontSize: 12, marginTop: spacing(1.5) },
+  convertBtn: {
+    flex: 1, backgroundColor: colors.surfaceAlt, borderRadius: 10, borderWidth: 1,
+    paddingVertical: spacing(1.25), alignItems: "center",
+  },
+  convertOff: { opacity: 0.4 },
+  convertText: { fontWeight: "800", fontSize: 14 },
+  capNote: { color: colors.gold, fontSize: 12, marginTop: spacing(1) },
   dungeonBtn: {
     backgroundColor: colors.surfaceAlt,
     borderColor: colors.danger,

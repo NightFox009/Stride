@@ -6,7 +6,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { treeFor, describeEntry } from "../../engine/classTree.js";
 import { SKILLS } from "../../engine/skills.js";
 import { useStride } from "../state/StrideContext.js";
-import { knownEntry } from "../game/profile.js";
+import { skillLevelOf } from "../game/profile.js";
 import { colors, spacing } from "../theme.js";
 
 export default function SkillsScreen({ onBack }) {
@@ -39,27 +39,34 @@ export default function SkillsScreen({ onBack }) {
 
       <Text style={styles.sectionTitle}>Class progression</Text>
       {tree.map((e) => {
-        const known = knownEntry(profile, e);
+        const lvl = skillLevelOf(profile, e.id);
+        const known = lvl > 0;
+        const atMax = lvl >= e.max;
         const levelLocked = profile.level < e.level;
         const tooPoor = sp < e.cost;
-        const learnable = !known && !levelLocked && !tooPoor;
+        const canBuy = !atMax && !levelLocked && !tooPoor;
         return (
           <View key={e.id} style={styles.card}>
             <View style={styles.entryHead}>
-              <Text style={styles.entryName}>
-                {e.name}
-                <Text style={styles.kind}>  {e.kind === "passive" ? "Passive" : "Active"}</Text>
-              </Text>
-              {known ? (
-                <Text style={styles.learned}>✓ Learned</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.entryName}>
+                  {e.name}
+                  <Text style={styles.kind}>  {e.kind === "passive" ? "Passive" : "Active"}</Text>
+                </Text>
+                <Text style={styles.lvlTag}>
+                  {known ? `Lv ${lvl} / ${e.max}` : `Lv 0 / ${e.max}`}
+                </Text>
+              </View>
+              {atMax ? (
+                <Text style={styles.learned}>★ Max</Text>
               ) : (
                 <Pressable
-                  disabled={!learnable}
+                  disabled={!canBuy}
                   onPress={() => learn(e.id)}
-                  style={[styles.learnBtn, !learnable && styles.learnOff]}
+                  style={[styles.learnBtn, !canBuy && styles.learnOff]}
                 >
-                  <Text style={[styles.learnText, !learnable && styles.learnTextOff]}>
-                    {levelLocked ? `Lv ${e.level}` : `Learn · ${e.cost} SP`}
+                  <Text style={[styles.learnText, !canBuy && styles.learnTextOff]}>
+                    {levelLocked ? `Lv ${e.level}` : `${known ? "Upgrade" : "Learn"} · ${e.cost} SP`}
                   </Text>
                 </Pressable>
               )}
@@ -94,6 +101,7 @@ const styles = StyleSheet.create({
   entryHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   entryName: { color: colors.text, fontSize: 16, fontWeight: "700" },
   kind: { color: colors.textDim, fontSize: 12, fontWeight: "600" },
+  lvlTag: { color: colors.gold, fontSize: 12, fontWeight: "700", marginTop: 2 },
   entryDesc: { color: colors.textDim, fontSize: 13, marginTop: spacing(0.5), lineHeight: 19 },
   locked: { color: colors.textDim, fontSize: 12, marginTop: spacing(0.5), fontStyle: "italic" },
   learned: { color: colors.accent, fontSize: 14, fontWeight: "800" },

@@ -35,14 +35,16 @@ export const PASSIVES = {
   windfall:     { id: "windfall",     name: "Windfall",      describe: "+6 Agility",   mods: { AGI: 6 } },
 };
 
-// Sum the stat mods from a list of learned passive ids.
-export function passiveMods(passiveIds = []) {
+// Sum the stat mods from learned passives, scaled by each passive's level
+// (a level-N passive grants N× its base bonus). `levels` maps id -> level.
+export function passiveMods(passiveIds = [], levels = {}) {
   const total = {};
   for (const id of passiveIds) {
     const p = PASSIVES[id];
     if (!p) continue;
+    const lvl = levels[id] || 1;
     for (const [stat, v] of Object.entries(p.mods)) {
-      total[stat] = (total[stat] || 0) + v;
+      total[stat] = (total[stat] || 0) + v * lvl;
     }
   }
   return total;

@@ -13,13 +13,14 @@ import { SKILLS } from "./skills.js";
 import { createRng } from "./rng.js";
 
 // Build a live combatant from a stat block.
-export function makeCombatant({ name, stats, skills = [], isPlayer = false, hp = null, bonusHP = 0 }) {
+export function makeCombatant({ name, stats, skills = [], skillLevels = {}, isPlayer = false, hp = null, bonusHP = 0 }) {
   const maxHP = (hp != null ? hp : derive.maxHP(stats)) + bonusHP;
   return {
     name,
     stats,
     isPlayer,
     skills,
+    skillLevels,
     hp: maxHP,
     maxHP,
     mp: derive.maxMP(stats),
@@ -115,12 +116,16 @@ function performPlayerAction(rng, player, enemies, action, emit) {
     player.mp -= skill.cost;
     emit({ type: "skill", actor: player.name, skill: skill.name, cost: skill.cost });
     const targets = resolveTargets(skill.target, player, enemies, action.targetIndex);
+    // Skill level scales its power: +12% per rank above 1 (damage and healing).
+    const lvl = (player.skillLevels && player.skillLevels[skill.id]) || 1;
+    const power = 1 + 0.12 * (lvl - 1);
     const ctx = {
       user: player,
       targets,
       rng,
-      dealDamage: (u, t, amt, ty, o) => dealDamage(rng, u, t, amt, ty, o),
-      heal,
+      power,
+      dealDamage: (u, t, amt, ty, o) => dealDamage(rng, u, t, amt * power, ty, o),
+      heal: (t, amt) => heal(t, Math.round(amt * power)),
     };
     for (const ev of skill.effect(ctx)) emit(ev);
     return null;

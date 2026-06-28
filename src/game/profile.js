@@ -5,7 +5,7 @@
 
 import { BASE_CLASSES, startingStatsFor } from "../../engine/classes.js";
 import { derive } from "../../engine/stats.js";
-import { effectiveStats, treeFor } from "../../engine/classTree.js";
+import { effectiveStats, treeFor, maxLevelFor } from "../../engine/classTree.js";
 import {
   gainExp as engineGainExp,
   stepsToXP,
@@ -15,6 +15,7 @@ import {
 } from "../../engine/progression.js";
 
 export const SAVE_VERSION = 1;
+export const MAX_ENERGY = 200; // hard cap on stored Energy
 
 // Build a fresh profile for a newly chosen base class.
 export function createProfile(classId) {
@@ -32,22 +33,22 @@ export function createProfile(classId) {
     stats: startingStatsFor(classId),
     skills: [...cls.skills],
     passives: [],
+    skillLevels: {}, // id -> rank, for learned tree skills/passives
     energy: 0,
     gold: 0,
     // Deepest floor not yet cleared — the dungeon's "current floor".
     floor: 1,
-    // Lifetime + banking. We bank fractional steps so nothing is lost between
-    // the 10-steps-per-XP and 100-steps-per-Energy thresholds.
+    // Raw steps waiting to be converted into EXP or Energy by the player.
     totalSteps: 0,
-    stepBankXP: 0,
-    stepBankEnergy: 0,
+    stepBank: 0,
     lastSyncAt: Date.now(),
   };
 }
 
-// The stat block actually used in combat: base allocation + passive bonuses.
+// The stat block actually used in combat: base allocation + passive bonuses
+// (scaled by each passive's level).
 export function statsWithPassives(profile) {
-  return effectiveStats(profile.stats, profile.passives || []);
+  return effectiveStats(profile.stats, profile.passives || [], profile.skillLevels || {});
 }
 
 // Derived, never-persisted view used by the UI (HP/MP/attack/etc.). Uses the
@@ -66,41 +67,56 @@ export function deriveSheet(profile) {
   };
 }
 
-// The core walk->reward loop. Takes raw new steps and returns a NEW profile plus
-// a summary of what was earned, so the UI can animate/toast level-ups.
+// Banks new steps. Steps no longer auto-convert — the player chooses to spend
+// the bank on EXP or Energy via convertSteps().
 export function applySteps(profile, newSteps) {
   newSteps = Math.max(0, Math.floor(newSteps));
-  if (newSteps === 0) {
-    return { profile, earned: { steps: 0, xp: 0, energy: 0, levelsGained: [] } };
-  }
+  if (newSteps === 0) return { profile, earned: { steps: 0 } };
 
-  let p = { ...profile };
+  const p = { ...profile };
   p.totalSteps += newSteps;
+  p.stepBank = (p.stepBank || 0) + newSteps;
   p.lastSyncAt = Date.now();
+  return { profile: p, earned: { steps: newSteps } };
+}
 
-  // Bank fractional steps so partial progress carries over between syncs.
-  p.stepBankXP += newSteps;
-  const xpGain = stepsToXP(p.stepBankXP);
-  p.stepBankXP -= xpGain * TUNING.stepsPerXP;
+// How much EXP / Energy the current step bank could yield right now (Energy is
+// limited by remaining capacity under MAX_ENERGY).
+export function conversionPreview(profile) {
+  const bank = profile.stepBank || 0;
+  const capacity = Math.max(0, MAX_ENERGY - (profile.energy || 0));
+  return {
+    bank,
+    xp: stepsToXP(bank),
+    energy: Math.min(stepsToEnergy(bank), capacity),
+  };
+}
 
-  p.stepBankEnergy += newSteps;
-  const energyGain = stepsToEnergy(p.stepBankEnergy);
-  p.stepBankEnergy -= energyGain * TUNING.stepsPerEnergy;
+// Convert banked steps into either EXP ("exp") or Energy ("energy"). Consumes
+// only the whole-unit portion; the remainder stays banked. Returns a new profile
+// plus a summary for the UI.
+export function convertSteps(profile, mode) {
+  let p = { ...profile };
+  const bank = p.stepBank || 0;
 
-  p.energy += energyGain;
-
-  let levelsGained = [];
-  if (xpGain > 0) {
-    const res = engineGainExp(p, xpGain);
+  if (mode === "exp") {
+    const xp = stepsToXP(bank);
+    if (xp <= 0) return { profile, converted: { mode, steps: 0, xp: 0, levelsGained: [] } };
+    p.stepBank = bank - xp * TUNING.stepsPerXP;
+    const res = engineGainExp(p, xp);
     p = res.profile;
-    levelsGained = res.levelsGained;
+    const levelsGained = res.levelsGained;
     p.skillPoints = (p.skillPoints || 0) + levelsGained.length; // 1 skill point / level
+    return { profile: p, converted: { mode, steps: xp * TUNING.stepsPerXP, xp, levelsGained } };
   }
 
-  return {
-    profile: p,
-    earned: { steps: newSteps, xp: xpGain, energy: energyGain, levelsGained },
-  };
+  // energy
+  const capacity = Math.max(0, MAX_ENERGY - (p.energy || 0));
+  const energy = Math.min(stepsToEnergy(bank), capacity);
+  if (energy <= 0) return { profile, converted: { mode, steps: 0, energy: 0 } };
+  p.stepBank = bank - energy * TUNING.stepsPerEnergy;
+  p.energy = (p.energy || 0) + energy;
+  return { profile: p, converted: { mode, steps: energy * TUNING.stepsPerEnergy, energy } };
 }
 
 // Fold a completed dungeon-floor result (from engine/dungeon.js runFloor) back
@@ -139,24 +155,29 @@ export function applyAllocation(profile, alloc) {
   return { ...profile, statPoints: profile.statPoints - spend, stats };
 }
 
-// Learn a class-tree skill/passive with skill points. Validates level + cost +
-// not-already-known. Returns a new profile (or the same if not learnable).
+// Learn or rank up a class-tree skill/passive with skill points. The first
+// purchase learns it (level 1); further purchases raise its level up to its max.
+// Validates character level + cost + cap. Returns a new profile (or the same).
 export function learnSkill(profile, entryId) {
   const entry = treeFor(profile.classId).find((e) => e.id === entryId);
   if (!entry) return profile;
-  const known = entry.kind === "passive" ? profile.passives || [] : profile.skills || [];
-  if (known.includes(entry.id)) return profile;
+  const max = maxLevelFor(entry);
+  const levels = profile.skillLevels || {};
+  const current = levels[entry.id] || 0;
+  if (current >= max) return profile;
   if (profile.level < entry.level) return profile;
   if ((profile.skillPoints || 0) < entry.cost) return profile;
 
   const next = { ...profile, skillPoints: profile.skillPoints - entry.cost };
-  if (entry.kind === "passive") next.passives = [...(profile.passives || []), entry.id];
-  else next.skills = [...(profile.skills || []), entry.id];
+  next.skillLevels = { ...levels, [entry.id]: current + 1 };
+  if (current === 0) {
+    if (entry.kind === "passive") next.passives = [...(profile.passives || []), entry.id];
+    else next.skills = [...(profile.skills || []), entry.id];
+  }
   return next;
 }
 
 // Helpers the UI uses to render the skill tree.
-export function knownEntry(profile, entry) {
-  const known = entry.kind === "passive" ? profile.passives || [] : profile.skills || [];
-  return known.includes(entry.id);
+export function skillLevelOf(profile, id) {
+  return (profile.skillLevels || {})[id] || 0;
 }

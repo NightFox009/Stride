@@ -21,10 +21,10 @@ function betweenWaveRecovery(player) {
 
 // Returns a controller: snapshot() for the current view, and act()/attack()/
 // skill()/flee() to take the player's turn. Non-combat floors resolve instantly.
-export function createFloorSession({ floor, stats, skills, level = 1, rng = createRng() }) {
+export function createFloorSession({ floor, stats, skills, skillLevels = {}, level = 1, rng = createRng() }) {
   const cost = energyCost(floor);
   const { type, waves } = buildWaves(floor, rng);
-  const player = makeCombatant({ name: "You", stats, skills, isPlayer: true, bonusHP: levelHpBonus(level) });
+  const player = makeCombatant({ name: "You", stats, skills, skillLevels, isPlayer: true, bonusHP: levelHpBonus(level) });
 
   const log = [];
   const emit = (e) => { log.push(e); return e; };
@@ -133,7 +133,7 @@ export function createFloorSession({ floor, stats, skills, level = 1, rng = crea
   const skillMenu = skills
     .map((id) => {
       const s = SKILLS[id];
-      return s ? { id, name: s.name, cost: s.cost, target: s.target, describe: s.describe } : null;
+      return s ? { id, name: s.name, cost: s.cost, target: s.target, describe: s.describe, level: skillLevels[id] || 1 } : null;
     })
     .filter(Boolean);
 

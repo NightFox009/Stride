@@ -13,6 +13,7 @@ import { loadProfile, saveProfile, clearProfile } from "../game/persistence.js";
 import {
   createProfile,
   applySteps,
+  convertSteps,
   applyAllocation,
   learnSkill,
   applyFloorResult,
@@ -67,13 +68,22 @@ export function StrideProvider({ children }) {
     setLastEarned(null);
   }, []);
 
-  // The walk loop. Safe to call from the pedometer subscription at any rate.
+  // The walk loop — just banks steps. Conversion to EXP/Energy is a player choice.
   const ingestSteps = useCallback((steps) => {
     const current = profileRef.current;
     if (!current || steps <= 0) return;
-    const { profile: next, earned } = applySteps(current, steps);
+    const { profile: next } = applySteps(current, steps);
     setProfile(next);
-    if (earned.xp > 0 || earned.energy > 0) setLastEarned(earned);
+  }, []);
+
+  // Convert banked steps into "exp" or "energy". Returns the summary for the UI.
+  const convert = useCallback((mode) => {
+    const p = profileRef.current;
+    if (!p) return null;
+    const { profile: next, converted } = convertSteps(p, mode);
+    setProfile(next);
+    if (converted.steps > 0) setLastEarned(converted);
+    return converted;
   }, []);
 
   const allocateStats = useCallback((alloc) => {
@@ -96,6 +106,7 @@ export function StrideProvider({ children }) {
       floor,
       stats: statsWithPassives(p), // base allocation + passive bonuses
       skills: p.skills,
+      skillLevels: p.skillLevels || {},
       level: p.level,
       rng: createRng(),
     });
@@ -119,6 +130,7 @@ export function StrideProvider({ children }) {
     startGame,
     resetGame,
     ingestSteps,
+    convert,
     allocateStats,
     learn,
     beginFloorSession,

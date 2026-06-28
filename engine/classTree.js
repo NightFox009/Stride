@@ -76,7 +76,12 @@ export function treeFor(classId) {
   return CLASS_TREE[classId] || [];
 }
 
-// Look up display info (name/describe/cost) for a tree entry.
+// Max rank a tree entry can reach (actives go higher than passives).
+export function maxLevelFor(entry) {
+  return entry.max ?? (entry.kind === "passive" ? 3 : 5);
+}
+
+// Look up display info (name/describe/cost/max) for a tree entry.
 export function describeEntry(entry) {
   const src = entry.kind === "passive" ? PASSIVES[entry.id] : SKILLS[entry.id];
   return {
@@ -84,12 +89,14 @@ export function describeEntry(entry) {
     name: src?.name ?? entry.id,
     describe: src?.describe ?? "",
     mpCost: entry.kind === "active" ? src?.cost : undefined,
+    max: maxLevelFor(entry),
   };
 }
 
-// Effective stats = base allocated stats + all learned passive bonuses.
-export function effectiveStats(baseStats, passiveIds = []) {
-  const mods = passiveMods(passiveIds);
+// Effective stats = base allocated stats + learned passive bonuses (scaled by
+// each passive's level via `skillLevels`).
+export function effectiveStats(baseStats, passiveIds = [], skillLevels = {}) {
+  const mods = passiveMods(passiveIds, skillLevels);
   const out = makeStats(baseStats);
   for (const [stat, v] of Object.entries(mods)) {
     out[stat] = (out[stat] || 0) + v;

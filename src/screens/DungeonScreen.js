@@ -230,7 +230,7 @@ export default function DungeonScreen({ onBack }) {
           return (
             <ActionBtn
               key={sk.id}
-              label={`${sk.name}`}
+              label={`${sk.name}${sk.level > 1 ? ` Lv${sk.level}` : ""}`}
               sub={`${sk.cost} MP`}
               disabled={disabled}
               onPress={() => { sessionRef.current.skill(sk.id, liveTarget); rerender(); }}
