@@ -15,3 +15,15 @@ export const colors = {
 };
 
 export const spacing = (n) => n * 8;
+
+// One colour per stat — used by the class-affinity pie chart so each class has a
+// recognisable "shape" without ever spelling out which stat it favours.
+export const STAT_COLORS = {
+  STR: "#f47174", // red
+  END: "#e3a857", // amber
+  AGI: "#5ad1a0", // green
+  VIT: "#f0a3c8", // pink
+  INT: "#6ea8fe", // blue
+  CHA: "#c792ea", // violet
+  LUK: "#e3b341", // gold
+};

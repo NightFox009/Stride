@@ -10,8 +10,8 @@ import { unlockedHiddenClasses } from "../../engine/classes.js";
 import ProgressBar from "../components/ProgressBar.js";
 import { colors, spacing } from "../theme.js";
 
-export default function HomeScreen({ onOpenStats }) {
-  const { profile, sheet, ingestSteps, lastEarned } = useStride();
+export default function HomeScreen({ onOpenStats, onOpenDungeon }) {
+  const { profile, sheet, ingestSteps, lastEarned, floorCost } = useStride();
   const { available, error, addManualSteps } = useStepSource(ingestSteps);
 
   const hidden = unlockedHiddenClasses(profile.stats);
@@ -44,12 +44,24 @@ export default function HomeScreen({ onOpenStats }) {
         <ProgressBar label="EXP" value={profile.exp} max={sheet.expToNext} color={colors.exp} />
         <ProgressBar label="Energy" value={profile.energy} color={colors.accent} suffix="⚡" />
         <View style={styles.statRow}>
-          <Stat k="Steps" v={profile.totalSteps.toLocaleString()} />
+          <Stat k="Floor" v={profile.floor || 1} />
           <Stat k="Gold" v={profile.gold} />
           <Stat k="HP" v={sheet.maxHP} />
           <Stat k="MP" v={sheet.maxMP} />
         </View>
       </View>
+
+      {/* Dungeon entry — the place Energy gets spent. */}
+      <Pressable
+        style={({ pressed }) => [styles.dungeonBtn, pressed && styles.dungeonBtnPressed]}
+        onPress={onOpenDungeon}
+      >
+        <Text style={styles.dungeonTitle}>⚔  Enter the Dungeon</Text>
+        <Text style={styles.dungeonSub}>
+          Floor {profile.floor || 1} · {floorCost}⚡
+          {profile.energy >= floorCost ? "  — ready" : "  — need more Energy"}
+        </Text>
+      </Pressable>
 
       {/* Step source status + dev walk controls */}
       <View style={styles.card}>
@@ -155,6 +167,17 @@ const styles = StyleSheet.create({
   walkBtnPressed: { backgroundColor: colors.border },
   walkBtnText: { color: colors.accent, fontWeight: "700", fontSize: 14 },
   earned: { color: colors.accent, fontSize: 13, marginTop: spacing(1.5), fontWeight: "600" },
+  dungeonBtn: {
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.danger,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: spacing(2),
+    marginBottom: spacing(1.5),
+  },
+  dungeonBtnPressed: { opacity: 0.85 },
+  dungeonTitle: { color: colors.text, fontSize: 18, fontWeight: "800" },
+  dungeonSub: { color: colors.textDim, fontSize: 13, marginTop: spacing(0.5) },
   statsLink: { padding: spacing(1.5), alignItems: "center" },
   statsLinkText: { color: colors.exp, fontSize: 15, fontWeight: "700" },
 });

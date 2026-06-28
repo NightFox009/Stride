@@ -31,6 +31,8 @@ export function createProfile(classId) {
     skills: [...cls.skills],
     energy: 0,
     gold: 0,
+    // Deepest floor not yet cleared — the dungeon's "current floor".
+    floor: 1,
     // Lifetime + banking. We bank fractional steps so nothing is lost between
     // the 10-steps-per-XP and 100-steps-per-Energy thresholds.
     totalSteps: 0,
@@ -89,6 +91,28 @@ export function applySteps(profile, newSteps) {
     profile: p,
     earned: { steps: newSteps, xp: xpGain, energy: energyGain, levelsGained },
   };
+}
+
+// Fold a completed dungeon-floor result (from engine/dungeon.js runFloor) back
+// into the profile: spend the energy, bank loot, award EXP through the engine
+// (handling level-ups), and advance the floor on a clear. Returns a new profile
+// plus the level-ups gained so the UI can celebrate them.
+export function applyFloorResult(profile, result) {
+  let p = { ...profile };
+  p.energy = Math.max(0, p.energy - (result.energySpent || 0));
+  p.gold += result.gold || 0;
+
+  let levelsGained = [];
+  if (result.xp > 0) {
+    const res = engineGainExp(p, result.xp);
+    p = res.profile;
+    levelsGained = res.levelsGained;
+  }
+
+  // Only a full clear pushes you deeper; defeat/flee keep you on this floor.
+  if (result.outcome === "cleared") p.floor = (p.floor || 1) + 1;
+
+  return { profile: p, levelsGained };
 }
 
 // Spend one stat point to raise a stat by 1. Returns a new profile (or the same

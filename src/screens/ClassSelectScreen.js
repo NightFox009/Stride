@@ -1,40 +1,79 @@
-// First-run screen: pick a base class. This is a permanent choice in the design,
-// so we confirm the signature stat and skills up front.
+// First-run screen: pick a base class. The class's stat affinity is shown only
+// as a pie chart that reshapes as you select — we never spell out "+Strength".
+// Tap a class to preview its affinity, then confirm to begin.
 
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
-import { BASE_CLASSES } from "../../engine/classes.js";
-import { STAT_NAMES } from "../../engine/stats.js";
+import { BASE_CLASSES, startingStatsFor } from "../../engine/classes.js";
+import { STATS } from "../../engine/stats.js";
 import { useStride } from "../state/StrideContext.js";
-import { colors, spacing } from "../theme.js";
+import PieChart from "../components/PieChart.js";
+import { colors, spacing, STAT_COLORS } from "../theme.js";
+
+// Flavour only — hints at playstyle without naming the stat it favours.
+const TAGLINES = {
+  knight: "A relentless frontline striker.",
+  sentinel: "An unbreakable guardian who outlasts any foe.",
+  monk: "Tireless and disciplined; wins the long fight.",
+  ranger: "Swift and precise, striking before they can react.",
+  scholar: "A scholar of devastating arcane power.",
+  herald: "An inspiring commander who turns the tide.",
+  wanderer: "Reckless and lucky; fortune favours the bold.",
+};
 
 export default function ClassSelectScreen() {
   const { startGame } = useStride();
   const classes = Object.values(BASE_CLASSES);
+  const [selectedId, setSelectedId] = useState(classes[0].id);
+
+  const selected = BASE_CLASSES[selectedId];
+  const stats = startingStatsFor(selectedId);
+  const pieData = STATS.map((stat) => ({
+    key: stat,
+    value: stats[stat],
+    color: STAT_COLORS[stat],
+    emphasized: stat === selected.boost,
+  }));
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Choose your path</Text>
       <Text style={styles.subtitle}>
-        Your class is permanent. Every class boosts a different stat — and its
-        signature skill scales off that same stat, so they're all viable.
+        Each class has a different affinity — read its shape below. Your choice is
+        permanent.
       </Text>
 
-      {classes.map((cls) => (
-        <Pressable
-          key={cls.id}
-          style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-          onPress={() => startGame(cls.id)}
-        >
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardName}>{cls.name}</Text>
-            <Text style={styles.boost}>+{STAT_NAMES[cls.boost]}</Text>
-          </View>
-          <Text style={styles.skills}>
-            Skills: {cls.skills.join(", ").replace(/_/g, " ")}
-          </Text>
-        </Pressable>
-      ))}
+      {/* Affinity preview */}
+      <View style={styles.preview}>
+        <PieChart data={pieData} size={210} />
+        <Text style={styles.previewName}>{selected.name}</Text>
+        <Text style={styles.previewTag}>{TAGLINES[selectedId]}</Text>
+      </View>
+
+      {/* Class chips */}
+      <View style={styles.chips}>
+        {classes.map((cls) => {
+          const active = cls.id === selectedId;
+          return (
+            <Pressable
+              key={cls.id}
+              onPress={() => setSelectedId(cls.id)}
+              style={[styles.chip, active && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                {cls.name}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Pressable
+        style={({ pressed }) => [styles.begin, pressed && styles.beginPressed]}
+        onPress={() => startGame(selectedId)}
+      >
+        <Text style={styles.beginText}>Begin as {selected.name}</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -43,24 +82,50 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing(2), paddingTop: spacing(7), paddingBottom: spacing(5) },
   title: { color: colors.text, fontSize: 28, fontWeight: "800" },
-  subtitle: {
-    color: colors.textDim,
-    fontSize: 14,
-    marginTop: spacing(1),
-    marginBottom: spacing(3),
-    lineHeight: 20,
-  },
-  card: {
+  subtitle: { color: colors.textDim, fontSize: 14, marginTop: spacing(1), lineHeight: 20 },
+  preview: {
+    alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: 14,
-    padding: spacing(2),
-    marginBottom: spacing(1.5),
+    borderRadius: 16,
+    paddingVertical: spacing(3),
+    marginTop: spacing(2.5),
   },
-  cardPressed: { backgroundColor: colors.surfaceAlt },
-  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  cardName: { color: colors.text, fontSize: 19, fontWeight: "700" },
-  boost: { color: colors.accent, fontSize: 14, fontWeight: "700" },
-  skills: { color: colors.textDim, fontSize: 13, marginTop: spacing(0.5), textTransform: "capitalize" },
+  previewName: { color: colors.text, fontSize: 22, fontWeight: "800", marginTop: spacing(2) },
+  previewTag: {
+    color: colors.textDim,
+    fontSize: 14,
+    marginTop: spacing(0.5),
+    textAlign: "center",
+    paddingHorizontal: spacing(2),
+    lineHeight: 20,
+  },
+  chips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing(1),
+    marginTop: spacing(2.5),
+    justifyContent: "center",
+  },
+  chip: {
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1.25),
+    borderRadius: 999,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  chipActive: { backgroundColor: colors.surfaceAlt, borderColor: colors.accent },
+  chipText: { color: colors.textDim, fontSize: 14, fontWeight: "600" },
+  chipTextActive: { color: colors.text },
+  begin: {
+    marginTop: spacing(3),
+    backgroundColor: colors.accent,
+    borderRadius: 14,
+    paddingVertical: spacing(2),
+    alignItems: "center",
+  },
+  beginPressed: { opacity: 0.85 },
+  beginText: { color: colors.bg, fontSize: 17, fontWeight: "800" },
 });

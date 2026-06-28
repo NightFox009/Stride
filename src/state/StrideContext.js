@@ -14,8 +14,13 @@ import {
   createProfile,
   applySteps,
   allocateStat,
+  applyFloorResult,
   deriveSheet,
 } from "../game/profile.js";
+import { autoPolicy } from "../game/combatPolicy.js";
+import { runFloor } from "../../engine/dungeon.js";
+import { energyCost } from "../../engine/floors.js";
+import { createRng } from "../../engine/rng.js";
 
 const StrideContext = createContext(null);
 
@@ -74,6 +79,30 @@ export function StrideProvider({ children }) {
     setProfile((p) => (p ? allocateStat(p, stat) : p));
   }, []);
 
+  // Run the current dungeon floor end-to-end with the shared auto-battle policy.
+  // Returns the full run (events + outcome) for the screen to render, and folds
+  // the rewards/penalty back into the profile. Returns null if too little Energy.
+  const runDungeonFloor = useCallback(() => {
+    const p = profileRef.current;
+    if (!p) return null;
+    const floor = p.floor || 1;
+    if (p.energy < energyCost(floor)) return null;
+
+    const result = runFloor({
+      floor,
+      stats: p.stats,
+      skills: p.skills,
+      choose: autoPolicy,
+      rng: createRng(),
+      energy: p.energy,
+      level: p.level,
+    });
+
+    const { profile: next, levelsGained } = applyFloorResult(p, result);
+    setProfile(next);
+    return { ...result, floor, levelsGained };
+  }, []);
+
   const value = {
     loading,
     profile,
@@ -83,6 +112,8 @@ export function StrideProvider({ children }) {
     resetGame,
     ingestSteps,
     spendStatPoint,
+    runDungeonFloor,
+    floorCost: profile ? energyCost(profile.floor || 1) : 0,
   };
 
   return <StrideContext.Provider value={value}>{children}</StrideContext.Provider>;
