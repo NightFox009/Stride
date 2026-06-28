@@ -24,7 +24,7 @@ function regenLabel(profile) {
 }
 
 export default function HomeScreen({ onOpenStats, onOpenDungeon, onOpenInventory }) {
-  const { profile, sheet, ingestSteps, convert, lastEarned, floorCost } = useStride();
+  const { profile, sheet, vitals, ingestSteps, convert, lastEarned, floorCost } = useStride();
   const { available, error, addManualSteps } = useStepSource(ingestSteps);
 
   const hidden = unlockedHiddenClasses(profile.stats);
@@ -70,11 +70,16 @@ export default function HomeScreen({ onOpenStats, onOpenDungeon, onOpenInventory
         <ProgressBar label="EXP" value={profile.exp} max={sheet.expToNext} color={colors.exp} />
         <ProgressBar label="Energy" value={profile.energy} max={MAX_ENERGY} color={colors.accent} suffix="⚡" />
         <Text style={styles.regen}>{regenLabel(profile)}</Text>
+        <ProgressBar label="HP" value={vitals.hp} max={vitals.maxHP} color={colors.hp} />
+        <ProgressBar label="MP" value={vitals.mp} max={vitals.maxMP} color={colors.exp} />
+        {(vitals.hp < vitals.maxHP || vitals.mp < vitals.maxMP) && (
+          <Text style={styles.regen}>recovering… (HP/MP regen over time, or rest floors heal you)</Text>
+        )}
         <View style={styles.statRow}>
           <Stat k="Floor" v={profile.floor || 1} />
           <Stat k="Gold" v={profile.gold} />
-          <Stat k="HP" v={sheet.maxHP} />
-          <Stat k="MP" v={sheet.maxMP} />
+          <Stat k="Attack" v={sheet.attack} />
+          <Stat k="Class" v={profile.className} />
         </View>
       </View>
 

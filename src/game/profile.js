@@ -27,6 +27,8 @@ export const SAVE_VERSION = 1;
 export const MAX_ENERGY = 200; // hard cap on stored Energy
 export const BASE_ENERGY = 100; // starting Energy for a new character
 export const ENERGY_REGEN_MS = 10 * 60 * 1000; // +1 Energy per 10 real minutes
+export const HP_REGEN_PER_MIN = 0.06; // fraction of max HP recovered per real minute
+export const MP_REGEN_PER_MIN = 0.08; // fraction of max MP per real minute
 // At most 2 of every 3 earned stat points may sit on one stat (so a level's
 // 3 points can't all go to the same stat — even across multiple allocations).
 export const STAT_FOCUS_RATIO = 2 / 3;
@@ -52,6 +54,9 @@ export function createProfile(classId) {
     inventory: [], // unequipped items
     equipment: { weapon: null, armor: null, accessory: null },
     materials: {}, // crafting materials: { matId: count }
+    currentHP: null, // carried HP between floors (null = full)
+    currentMP: null, // carried MP between floors (null = full)
+    lastRestTick: Date.now(), // for time-based HP/MP regen
     energy: BASE_ENERGY,
     gold: 0,
     // Deepest floor not yet cleared — the dungeon's "current floor".
@@ -225,6 +230,17 @@ export function applyFloorResult(profile, result) {
     p.materials = m;
   }
 
+  // Carry HP/MP to the next floor. Defeat respawns you at full; otherwise keep
+  // the HP/MP you ended the floor on (rest floors end you at full).
+  if (result.outcome === "defeat") {
+    p.currentHP = null;
+    p.currentMP = null;
+  } else if (result.finalHp != null) {
+    p.currentHP = result.finalHp;
+    p.currentMP = result.finalMp;
+  }
+  p.lastRestTick = Date.now(); // restart the regen clock after a floor
+
   return { profile: p, levelsGained };
 }
 
@@ -349,6 +365,43 @@ export function applyEnergyRegen(profile, now = Date.now()) {
   const gain = Math.min(Math.floor(elapsed / ENERGY_REGEN_MS), space);
   const newTick = gain >= space ? now : last + gain * ENERGY_REGEN_MS;
   return { ...profile, energy: energy + gain, lastEnergyTick: newTick };
+}
+
+// Current HP/MP (carried between floors) clamped to the live maximums.
+export function vitals(profile) {
+  const { maxHP, maxMP } = deriveSheet(profile);
+  return {
+    hp: profile.currentHP == null ? maxHP : Math.max(0, Math.min(profile.currentHP, maxHP)),
+    mp: profile.currentMP == null ? maxMP : Math.max(0, Math.min(profile.currentMP, maxMP)),
+    maxHP,
+    maxMP,
+  };
+}
+
+// Regenerate carried HP/MP from elapsed real time. Returns the SAME profile when
+// nothing changed so callers can pass it straight to setState.
+export function applyHpRegen(profile, now = Date.now()) {
+  if (!profile) return profile;
+  const { maxHP, maxMP } = deriveSheet(profile);
+  const hp = profile.currentHP == null ? maxHP : Math.min(profile.currentHP, maxHP);
+  const mp = profile.currentMP == null ? maxMP : Math.min(profile.currentMP, maxMP);
+  if (hp >= maxHP && mp >= maxMP) {
+    if (profile.currentHP == null && profile.currentMP == null) return profile;
+    return { ...profile, currentHP: null, currentMP: null, lastRestTick: now };
+  }
+  const last = profile.lastRestTick || profile.createdAt || now;
+  const minutes = (now - last) / 60000;
+  if (minutes <= 0) return profile;
+  const newHP = Math.min(maxHP, Math.round(hp + maxHP * HP_REGEN_PER_MIN * minutes));
+  const newMP = Math.min(maxMP, Math.round(mp + maxMP * MP_REGEN_PER_MIN * minutes));
+  if (newHP <= hp && newMP <= mp) return profile; // nothing meaningful yet — don't advance the clock
+  const full = newHP >= maxHP && newMP >= maxMP;
+  return {
+    ...profile,
+    currentHP: full ? null : newHP,
+    currentMP: full ? null : newMP,
+    lastRestTick: now,
+  };
 }
 
 // Milliseconds until the next +1 Energy (null if full).

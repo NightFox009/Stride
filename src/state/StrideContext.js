@@ -16,6 +16,8 @@ import {
   convertSteps,
   applyAllocation,
   applyEnergyRegen,
+  applyHpRegen,
+  vitals,
   learnSkill,
   awakenJob,
   applyFloorResult,
@@ -51,7 +53,7 @@ export function StrideProvider({ children }) {
     (async () => {
       const saved = await loadProfile();
       if (!cancelled) {
-        setProfile(saved ? applyEnergyRegen(saved) : saved);
+        setProfile(saved ? applyHpRegen(applyEnergyRegen(saved)) : saved);
         setLoading(false);
       }
     })();
@@ -64,7 +66,7 @@ export function StrideProvider({ children }) {
   // the same object when nothing changed, so this is a no-op render otherwise.
   useEffect(() => {
     const id = setInterval(() => {
-      setProfile((p) => (p ? applyEnergyRegen(p) : p));
+      setProfile((p) => (p ? applyHpRegen(applyEnergyRegen(p)) : p));
     }, 30000);
     return () => clearInterval(id);
   }, []);
@@ -138,11 +140,12 @@ export function StrideProvider({ children }) {
   const beginFloorSession = useCallback(() => {
     let p = profileRef.current;
     if (!p) return null;
-    // Catch up regen so the freshest Energy total gates the descent.
-    const regen = applyEnergyRegen(p);
+    // Catch up regen so the freshest Energy/HP gate the descent.
+    const regen = applyHpRegen(applyEnergyRegen(p));
     if (regen !== p) { p = regen; setProfile(p); }
     const floor = p.floor || 1;
     if (p.energy < energyCost(floor)) return null;
+    const v = vitals(p);
     return createFloorSession({
       floor,
       stats: combatStats(p), // base + passives + job perk
@@ -150,6 +153,8 @@ export function StrideProvider({ children }) {
       skillLevels: p.skillLevels || {},
       primaryStat: primaryStatOf(p),
       weaponTypes: allowedWeaponTypes(p),
+      startHP: v.hp,
+      startMP: v.mp,
       level: p.level,
       rng: createRng(),
     });
@@ -169,6 +174,7 @@ export function StrideProvider({ children }) {
     loading,
     profile,
     sheet: profile ? deriveSheet(profile) : null,
+    vitals: profile ? vitals(profile) : null,
     lastEarned,
     startGame,
     resetGame,

@@ -57,7 +57,7 @@ const TONE_COLOR = {
 };
 
 export default function DungeonScreen({ onBack }) {
-  const { profile, floorCost, beginFloorSession, commitFloorResult } = useStride();
+  const { profile, vitals, floorCost, beginFloorSession, commitFloorResult } = useStride();
   const sessionRef = useRef(null);
   const committedRef = useRef(false);
   const [, setTick] = useState(0);
@@ -125,6 +125,10 @@ export default function DungeonScreen({ onBack }) {
           </View>
           <Text style={styles.zone}>{zoneName(floor)}</Text>
           <Text style={styles.blurb}>{FLOOR_BLURB[type] ?? type}</Text>
+          <Text style={styles.vitals}>
+            HP {vitals.hp}/{vitals.maxHP}   ·   MP {vitals.mp}/{vitals.maxMP}
+            {vitals.hp < vitals.maxHP * 0.5 ? "  — consider recovering first" : ""}
+          </Text>
 
           {hasUnspent && COMBAT_FLOORS.has(type) && (
             <View style={styles.nudge}>
@@ -313,6 +317,7 @@ const styles = StyleSheet.create({
   energy: { color: colors.accent, fontSize: 18, fontWeight: "700" },
   zone: { color: colors.gold, fontSize: 13, fontWeight: "700", marginTop: 2 },
   blurb: { color: colors.textDim, fontSize: 14, marginTop: spacing(0.5), lineHeight: 20 },
+  vitals: { color: colors.hp, fontSize: 13, marginTop: spacing(0.75), fontWeight: "600" },
   nudge: {
     marginTop: spacing(1.5), backgroundColor: colors.surfaceAlt, borderRadius: 10,
     borderLeftWidth: 3, borderLeftColor: colors.gold, padding: spacing(1.25),
