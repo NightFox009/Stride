@@ -6,7 +6,7 @@
 import { BASE_CLASSES, startingStatsFor } from "../../engine/classes.js";
 import { derive } from "../../engine/stats.js";
 import { effectiveStats, treeFor, maxLevelFor, rankLevelReq } from "../../engine/classTree.js";
-import { getJob, jobsFor, JOB_LEVEL } from "../../engine/jobs.js";
+import { getJob, jobsFor, JOB_LEVEL, classWeaponTypes } from "../../engine/jobs.js";
 import { equipmentMods, SLOTS } from "../../engine/items.js";
 import {
   upgradeCost,
@@ -275,12 +275,33 @@ export function craftItemRarity(profile, itemId, rng) {
   return mapItem(p, itemId, (it) => withRarityUp(it, rng));
 }
 
+// Weapon types this character may equip: a hidden Luck job can use any (null);
+// a normal job is locked to its weapon; before awakening, both class weapons.
+export function allowedWeaponTypes(profile) {
+  const job = getJob(profile.job);
+  if (job && job.hidden) return null; // any weapon
+  if (job && job.weapon) return [job.weapon];
+  return classWeaponTypes(profile.classId);
+}
+
+// Can this character equip the given item? Only weapons are restricted.
+export function canEquipItem(profile, item) {
+  if (!item || item.slot !== "weapon") return true;
+  const allowed = allowedWeaponTypes(profile);
+  if (!allowed) return true; // any
+  const wt = item.weaponType || item.base;
+  if (!wt) return true; // legacy item without a type — allow
+  return allowed.includes(wt);
+}
+
 // Equip an item from the inventory; any item already in that slot returns to
-// the inventory. Returns a new profile.
+// the inventory. Weapons must match the character's allowed types. Returns a
+// new profile (unchanged if not equippable).
 export function equipItem(profile, itemId) {
   const inv = profile.inventory || [];
   const item = inv.find((i) => i.id === itemId);
   if (!item) return profile;
+  if (!canEquipItem(profile, item)) return profile;
   const equipment = { ...(profile.equipment || { weapon: null, armor: null, accessory: null }) };
   const prev = equipment[item.slot];
   const newInv = inv.filter((i) => i.id !== itemId);

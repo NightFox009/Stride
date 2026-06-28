@@ -12,9 +12,12 @@ const BRANCH_REQ = 33;  // its secondary stat
 const LUCK_REQ = 45;    // Luck for the hidden job
 const LUCK_SIG_REQ = 30;// the class stat for the hidden job
 
-function normalJob(id, name, classId, sig, branch, color, emblem, skill, blurb) {
+// `weapon` is the weapon TYPE this job wields. A character may only equip
+// weapons matching their class's job types (the two normal jobs differ). Hidden
+// Luck jobs use weapon: null = may wield ANY weapon type.
+function normalJob(id, name, classId, sig, branch, color, emblem, skill, weapon, blurb) {
   return {
-    id, name, classId, hidden: false, primary: sig, branch,
+    id, name, classId, hidden: false, primary: sig, branch, weapon,
     requires: { [sig]: SIG_REQ, [branch]: BRANCH_REQ },
     mods: { [sig]: 6, [branch]: 4 },
     skill, color, emblem, blurb,
@@ -23,7 +26,7 @@ function normalJob(id, name, classId, sig, branch, color, emblem, skill, blurb) 
 
 function luckJob(id, name, classId, sig, blurb) {
   return {
-    id, name, classId, hidden: true, primary: "LUK",
+    id, name, classId, hidden: true, primary: "LUK", weapon: null,
     requires: { LUK: LUCK_REQ, [sig]: LUCK_SIG_REQ },
     mods: { LUK: 6, [sig]: 4 },
     skill: "jackpot_strike", color: "#e3b341", emblem: "coin", blurb,
@@ -31,36 +34,41 @@ function luckJob(id, name, classId, sig, blurb) {
 }
 
 export const JOBS = {
-  // Knight (STR)
-  warlord:   normalJob("warlord", "Warlord", "knight", "STR", "END", "#ff6b5e", "blade", "warlords_cleave", "A relentless, tireless offense."),
-  crusader:  normalJob("crusader", "Crusader", "knight", "STR", "VIT", "#e8b04b", "tower", "crusaders_aegis", "An armored, immovable bruiser."),
+  // Knight (STR) — Greatsword vs Sword
+  warlord:   normalJob("warlord", "Warlord", "knight", "STR", "END", "#ff6b5e", "blade", "warlords_cleave", "Greatsword", "A relentless, tireless offense."),
+  crusader:  normalJob("crusader", "Crusader", "knight", "STR", "VIT", "#e8b04b", "tower", "crusaders_aegis", "Sword", "An armored, immovable bruiser."),
   fateblade: luckJob("fateblade", "Fateblade", "knight", "STR", "A blade guided by sheer fortune."),
 
-  // Sentinel (VIT)
-  guardian:  normalJob("guardian", "Guardian", "sentinel", "VIT", "END", "#3fb6a8", "tower", "fortress_stance", "An endlessly enduring wall."),
-  templar:   normalJob("templar", "Templar", "sentinel", "VIT", "CHA", "#c792ea", "crown", "consecration", "A holy defender who inspires."),
+  // Sentinel (VIT) — Spear vs Hammer
+  guardian:  normalJob("guardian", "Guardian", "sentinel", "VIT", "END", "#3fb6a8", "tower", "fortress_stance", "Spear", "An endlessly enduring wall."),
+  templar:   normalJob("templar", "Templar", "sentinel", "VIT", "CHA", "#c792ea", "crown", "consecration", "Hammer", "A holy defender who inspires."),
   fateguard: luckJob("fateguard", "Fateguard", "sentinel", "VIT", "A warden shielded by luck itself."),
 
-  // Monk (END)
-  grandmaster: normalJob("grandmaster", "Grandmaster", "monk", "END", "STR", "#e3a857", "fist", "hundred_hands", "A crushing martial master."),
-  stormfist:   normalJob("stormfist", "Stormfist", "monk", "END", "AGI", "#5ad1a0", "wing", "thunderclap", "A blur of lightning blows."),
+  // Monk (END) — Fist vs Staff
+  grandmaster: normalJob("grandmaster", "Grandmaster", "monk", "END", "STR", "#e3a857", "fist", "hundred_hands", "Fist", "A crushing martial master."),
+  stormfist:   normalJob("stormfist", "Stormfist", "monk", "END", "AGI", "#5ad1a0", "wing", "thunderclap", "Staff", "A blur of lightning blows."),
   fatefist:    luckJob("fatefist", "Fatefist", "monk", "END", "A martial artist riding fate's wind."),
 
-  // Ranger (AGI)
-  pathfinder: normalJob("pathfinder", "Pathfinder", "ranger", "AGI", "END", "#5ad1a0", "arrow", "hunters_focus", "A swift, untiring hunter."),
-  sniper:     normalJob("sniper", "Sniper", "ranger", "AGI", "INT", "#56c2d6", "eye", "kill_shot", "A calculating, deadly marksman."),
+  // Ranger (AGI) — Bow vs Crossbow
+  pathfinder: normalJob("pathfinder", "Pathfinder", "ranger", "AGI", "END", "#5ad1a0", "arrow", "hunters_focus", "Bow", "A swift, untiring hunter."),
+  sniper:     normalJob("sniper", "Sniper", "ranger", "AGI", "INT", "#56c2d6", "eye", "kill_shot", "Crossbow", "A calculating, deadly marksman."),
   fateseeker: luckJob("fateseeker", "Fateseeker", "ranger", "AGI", "A hunter whose every shot is fated."),
 
-  // Scholar (INT)
-  archmage:   normalJob("archmage", "Archmage", "scholar", "INT", "END", "#6ea8fe", "flame", "cataclysm", "Raw, devastating arcana."),
-  sage:       normalJob("sage", "Sage", "scholar", "INT", "VIT", "#56c2d6", "eye", "arcane_ward", "An enduring, wise mystic."),
+  // Scholar (INT) — Staff vs Wand
+  archmage:   normalJob("archmage", "Archmage", "scholar", "INT", "END", "#6ea8fe", "flame", "cataclysm", "Staff", "Raw, devastating arcana."),
+  sage:       normalJob("sage", "Sage", "scholar", "INT", "VIT", "#56c2d6", "eye", "arcane_ward", "Wand", "An enduring, wise mystic."),
   fateweaver: luckJob("fateweaver", "Fateweaver", "scholar", "INT", "A mage who weaves chance into spells."),
 
-  // Herald (CHA)
-  monarch:   normalJob("monarch", "Monarch", "herald", "CHA", "VIT", "#c792ea", "crown", "royal_command", "A commanding, regal ruler."),
-  marshal:   normalJob("marshal", "Marshal", "herald", "CHA", "STR", "#ff6b5e", "blade", "rallying_charge", "A frontline war-commander."),
+  // Herald (CHA) — Scepter vs Sword
+  monarch:   normalJob("monarch", "Monarch", "herald", "CHA", "VIT", "#c792ea", "crown", "royal_command", "Scepter", "A commanding, regal ruler."),
+  marshal:   normalJob("marshal", "Marshal", "herald", "CHA", "STR", "#ff6b5e", "blade", "rallying_charge", "Sword", "A frontline war-commander."),
   fatecaller: luckJob("fatecaller", "Fatecaller", "herald", "CHA", "A leader who commands fortune itself."),
 };
+
+// Weapon types a class can use before awakening (both normal jobs' weapons).
+export function classWeaponTypes(classId) {
+  return jobsFor(classId).filter((j) => !j.hidden && j.weapon).map((j) => j.weapon);
+}
 
 export function jobsFor(classId) {
   return Object.values(JOBS).filter((j) => j.classId === classId);

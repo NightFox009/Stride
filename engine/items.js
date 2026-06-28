@@ -19,9 +19,15 @@ export const RARITIES = {
 
 export const RARITY_ORDER = ["common", "uncommon", "rare", "epic", "legendary"];
 
+// Weapon TYPES (also a weapon's base noun). Jobs restrict which a class may use.
+export const WEAPON_TYPES = [
+  "Sword", "Greatsword", "Mace", "Spear", "Hammer", "Staff",
+  "Wand", "Bow", "Crossbow", "Dagger", "Fist", "Scepter",
+];
+
 // Base item names per slot (a random one is chosen for flavor).
 const SLOT_NAMES = {
-  weapon: ["Sword", "Axe", "Bow", "Staff", "Spear", "Dagger", "Mace"],
+  weapon: WEAPON_TYPES,
   armor: ["Mail", "Plate", "Robe", "Hauberk", "Cuirass", "Garb"],
   accessory: ["Ring", "Amulet", "Charm", "Band", "Talisman", "Pendant"],
 };
@@ -60,8 +66,9 @@ function uid() {
 }
 
 // Generate one item appropriate to a floor (item level ≈ floor). bonusFind
-// raises the quality (used by boss/elite drops).
-export function generateItem(floor, luck, rng, bonusFind = 0) {
+// raises quality; weaponTypes (if given) restricts weapon drops to types the
+// player can actually use, so loot stays usable.
+export function generateItem(floor, luck, rng, bonusFind = 0, weaponTypes = null) {
   const rarityId = rollRarity(rng, floor, luck, bonusFind);
   const rarity = RARITIES[rarityId];
   const slot = rng.pick(SLOTS);
@@ -77,8 +84,9 @@ export function generateItem(floor, luck, rng, bonusFind = 0) {
     mods[stat] = v;
   }
 
-  const baseName = rng.pick(SLOT_NAMES[slot]);
-  return {
+  const namePool = slot === "weapon" && weaponTypes && weaponTypes.length ? weaponTypes : SLOT_NAMES[slot];
+  const baseName = rng.pick(namePool);
+  const item = {
     id: uid(),
     slot,
     rarity: rarityId,
@@ -88,6 +96,8 @@ export function generateItem(floor, luck, rng, bonusFind = 0) {
     upgrade: 0, // +0..+30 enhancement level
     mods, // BASE stat bonuses; scaled by upgrade via itemMods()
   };
+  if (slot === "weapon") item.weaponType = baseName;
+  return item;
 }
 
 // Enhancement multiplier: +4% of base stats per upgrade level (so +30 ≈ ×2.2).
@@ -104,12 +114,12 @@ export function itemMods(item) {
 }
 
 // Roll the loot dropped by clearing a floor (at most one item). Bosses and
-// elites grant a quality bonus so their drops are worth the fight.
-export function rollLoot(floorType, floor, luck, rng) {
+// elites grant a quality bonus. weaponTypes restricts weapon drops to usable ones.
+export function rollLoot(floorType, floor, luck, rng, weaponTypes = null) {
   const chance = dropChance(floorType);
   if (chance <= 0 || rng.next() >= chance) return [];
   const bonusFind = floorType === "boss" ? 22 : floorType === "elite" ? 8 : 0;
-  return [generateItem(floor, luck, rng, bonusFind)];
+  return [generateItem(floor, luck, rng, bonusFind, weaponTypes)];
 }
 
 // Total stat bonuses from a set of equipped items (an { slot: item } map),

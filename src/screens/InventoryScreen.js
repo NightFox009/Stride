@@ -14,6 +14,7 @@ import {
   MAX_UPGRADE,
 } from "../../engine/crafting.js";
 import { useStride } from "../state/StrideContext.js";
+import { canEquipItem, allowedWeaponTypes } from "../game/profile.js";
 import { colors, spacing } from "../theme.js";
 
 const SLOT_LABEL = { weapon: "Weapon", armor: "Armor", accessory: "Accessory" };
@@ -43,6 +44,7 @@ export default function InventoryScreen({ onBack }) {
     const c = RARITIES[it.rarity]?.color;
     const up = upgradeCost(it);
     const rar = rarityUpgradeCost(it);
+    const usable = canEquipItem(profile, it);
     return (
       <View style={[styles.card, { borderColor: c }]}>
         <Text style={[styles.itemName, { color: c }]}>
@@ -51,12 +53,15 @@ export default function InventoryScreen({ onBack }) {
           <Text style={styles.slotTag}>  · {SLOT_LABEL[it.slot]} · iLv{it.level}</Text>
         </Text>
         <Text style={styles.mods}>{modText(it)}</Text>
+        {!usable && (
+          <Text style={styles.locked}>🚫 Your class can't wield {it.weaponType || it.base}</Text>
+        )}
 
         <View style={styles.actions}>
           {equipped ? (
             <Btn label="Unequip" onPress={() => unequip(slot)} />
           ) : (
-            <Btn label="Equip" primary onPress={() => equip(it.id)} />
+            <Btn label="Equip" primary disabled={!usable} onPress={() => equip(it.id)} />
           )}
           {up ? (
             <Btn
@@ -104,6 +109,9 @@ export default function InventoryScreen({ onBack }) {
       </View>
 
       <Text style={styles.section}>Equipped</Text>
+      <Text style={styles.weaponNote}>
+        Weapons usable: {allowedWeaponTypes(profile) ? allowedWeaponTypes(profile).join(", ") : "any (Luck path)"}
+      </Text>
       {SLOTS.map((slot) =>
         equipment[slot] ? (
           <ItemCard key={slot} it={equipment[slot]} equipped slot={slot} />
@@ -165,6 +173,8 @@ const styles = StyleSheet.create({
   plus: { color: colors.gold, fontSize: 15, fontWeight: "800" },
   slotTag: { color: colors.textDim, fontSize: 12, fontWeight: "500" },
   mods: { color: colors.text, fontSize: 13, marginTop: 3 },
+  locked: { color: colors.danger, fontSize: 12, marginTop: 3, fontWeight: "600" },
+  weaponNote: { color: colors.textDim, fontSize: 12, marginTop: -spacing(0.5), marginBottom: spacing(0.5) },
   empty: { color: colors.textDim, fontSize: 13, fontStyle: "italic", marginTop: 2 },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing(1), marginTop: spacing(1) },
   btn: {

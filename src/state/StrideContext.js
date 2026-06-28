@@ -27,6 +27,7 @@ import {
   deriveSheet,
   combatStats,
   primaryStatOf,
+  allowedWeaponTypes,
 } from "../game/profile.js";
 import { createFloorSession } from "../../engine/dungeonSession.js";
 import { energyCost } from "../../engine/floors.js";
@@ -148,6 +149,7 @@ export function StrideProvider({ children }) {
       skills: p.skills,
       skillLevels: p.skillLevels || {},
       primaryStat: primaryStatOf(p),
+      weaponTypes: allowedWeaponTypes(p),
       level: p.level,
       rng: createRng(),
     });
