@@ -4,7 +4,7 @@
 
 import React, { useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
-import { CATEGORIES, RARITIES, itemMods } from "../../engine/items.js";
+import { CATEGORIES, RARITIES, itemMods, statLabel } from "../../engine/items.js";
 import {
   upgradeCost,
   rarityUpgradeCost,
@@ -23,7 +23,7 @@ const SLOT_LABEL = {
 };
 
 function modText(item) {
-  return Object.entries(itemMods(item)).map(([s, v]) => `+${v} ${s}`).join("  ");
+  return Object.entries(itemMods(item)).map(([s, v]) => `+${v} ${statLabel(s, item.forClass)}`).join("  ");
 }
 function costText(cost) {
   if (!cost) return "";

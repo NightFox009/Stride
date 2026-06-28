@@ -39,15 +39,26 @@ export const CLASS_GEAR = {
   herald:   { set: "Regal", sub: "Banner" },
 };
 
-// Per-class main stat for each slot, so each piece has a distinct, class-fitting
-// role (e.g. gloves = the class's "attack/cast" stat).
+// SPD is a gear-only stat (not one of the 7 allocatable stats): it adds to
+// combat initiative so you act first. Flavoured per class as Attack/Cast Speed.
+export const SPD_STAT = "SPD";
+export function spdLabel(classId) {
+  return classId === "scholar" ? "Cast Speed" : "Attack Speed";
+}
+// Pretty label for a stat on an item (SPD shows its class flavour).
+export function statLabel(stat, forClass) {
+  return stat === SPD_STAT ? spdLabel(forClass) : stat;
+}
+
+// Per-class main stat for each slot. Gloves grant SPD (Attack/Cast Speed) so
+// they decide who strikes first; the rest favour the class's core stats.
 export const CLASS_FOCUS = {
-  knight:   { weapon: "STR", subweapon: "STR", helm: "VIT", armor: "VIT", gloves: "STR", boots: "END", accessory: "LUK" },
-  sentinel: { weapon: "VIT", subweapon: "VIT", helm: "END", armor: "VIT", gloves: "VIT", boots: "END", accessory: "CHA" },
-  monk:     { weapon: "END", subweapon: "END", helm: "VIT", armor: "END", gloves: "END", boots: "AGI", accessory: "LUK" },
-  ranger:   { weapon: "AGI", subweapon: "AGI", helm: "END", armor: "VIT", gloves: "AGI", boots: "AGI", accessory: "LUK" },
-  scholar:  { weapon: "INT", subweapon: "INT", helm: "INT", armor: "VIT", gloves: "INT", boots: "AGI", accessory: "LUK" },
-  herald:   { weapon: "CHA", subweapon: "CHA", helm: "VIT", armor: "VIT", gloves: "CHA", boots: "AGI", accessory: "LUK" },
+  knight:   { weapon: "STR", subweapon: "STR", helm: "VIT", armor: "VIT", gloves: "SPD", boots: "END", accessory: "LUK" },
+  sentinel: { weapon: "VIT", subweapon: "VIT", helm: "END", armor: "VIT", gloves: "SPD", boots: "END", accessory: "CHA" },
+  monk:     { weapon: "END", subweapon: "END", helm: "VIT", armor: "END", gloves: "SPD", boots: "AGI", accessory: "LUK" },
+  ranger:   { weapon: "AGI", subweapon: "AGI", helm: "END", armor: "VIT", gloves: "SPD", boots: "AGI", accessory: "LUK" },
+  scholar:  { weapon: "INT", subweapon: "INT", helm: "INT", armor: "VIT", gloves: "SPD", boots: "AGI", accessory: "LUK" },
+  herald:   { weapon: "CHA", subweapon: "CHA", helm: "VIT", armor: "VIT", gloves: "SPD", boots: "AGI", accessory: "LUK" },
 };
 
 const SLOT_NOUN = { helm: "Helm", armor: "Armor", gloves: "Gloves", boots: "Boots" };

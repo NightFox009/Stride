@@ -8,7 +8,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { useStride } from "../state/StrideContext.js";
 import { floorType } from "../../engine/floors.js";
 import { zoneName } from "../../engine/zones.js";
-import { RARITIES } from "../../engine/items.js";
+import { RARITIES, statLabel } from "../../engine/items.js";
 import { MATERIALS } from "../../engine/crafting.js";
 import ProgressBar from "../components/ProgressBar.js";
 import { colors, spacing } from "../theme.js";
@@ -177,7 +177,7 @@ export default function DungeonScreen({ onBack }) {
               <Text style={styles.lootTitle}>Loot dropped!</Text>
               {r.loot.map((it) => (
                 <Text key={it.id} style={[styles.lootItem, { color: RARITIES[it.rarity]?.color }]}>
-                  {it.name} — {Object.entries(it.mods).map(([s, v]) => `+${v} ${s}`).join(", ")}
+                  {it.name} — {Object.entries(it.mods).map(([s, v]) => `+${v} ${statLabel(s, it.forClass)}`).join(", ")}
                 </Text>
               ))}
             </View>

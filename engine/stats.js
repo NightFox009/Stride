@@ -37,7 +37,7 @@ export const derive = {
   critChance: (s) => clamp(5 + s.LUK * 0.5, 0, 75), // %  (LUK)
   critMult: (s = {}) => 1.7 + (s.STR || 0) * 0.01, // STR → harder crits
   dodgeChance: (s) => clamp(s.AGI * 0.4 + s.LUK * 0.2, 0, 60), // %  (AGI, LUK)
-  speed: (s) => s.AGI, // turn order  (AGI)
+  speed: (s) => s.AGI + (s.SPD || 0), // turn order: Agility + gear Attack/Cast Speed
   hpRegenPerFloor: (s) => Math.round(s.VIT * 0.5 + s.CHA * 0.4), // (VIT, CHA)
   fleeChance: (s) => clamp(25 + s.AGI * 0.4, 5, 95), // % — fleeing forfeits, so not a perk
 };
