@@ -61,15 +61,6 @@ export const CLASS_TREE = {
     { id: "anthem", kind: "active", level: 20, cost: 2 },
     { id: "silver_tongue", kind: "passive", level: 30, cost: 2 },
   ],
-  wanderer: [
-    { id: "coin_toss", kind: "active", level: 1, cost: 1 },
-    { id: "fortunate", kind: "passive", level: 1, cost: 1 },
-    { id: "gambit", kind: "active", level: 5, cost: 1 },
-    { id: "lucky_strike", kind: "active", level: 10, cost: 1 },
-    { id: "lucky_charm", kind: "passive", level: 15, cost: 1 },
-    { id: "fortunes_wheel", kind: "active", level: 20, cost: 2 },
-    { id: "windfall", kind: "passive", level: 30, cost: 2 },
-  ],
 };
 
 export function treeFor(classId) {

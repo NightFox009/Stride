@@ -6,7 +6,7 @@
 import { BASE_CLASSES, startingStatsFor } from "../../engine/classes.js";
 import { derive } from "../../engine/stats.js";
 import { effectiveStats, treeFor, maxLevelFor, rankLevelReq } from "../../engine/classTree.js";
-import { getJob, jobsFor, siblingJob, JOB_LEVEL } from "../../engine/jobs.js";
+import { getJob, jobsFor, JOB_LEVEL } from "../../engine/jobs.js";
 import {
   gainExp as engineGainExp,
   stepsToXP,
@@ -22,10 +22,6 @@ export const ENERGY_REGEN_MS = 10 * 60 * 1000; // +1 Energy per 10 real minutes
 // At most 2 of every 3 earned stat points may sit on one stat (so a level's
 // 3 points can't all go to the same stat — even across multiple allocations).
 export const STAT_FOCUS_RATIO = 2 / 3;
-// To awaken a job you must have committed at least this fraction of ALL earned
-// stat points into its signature + branch stats — so you can't qualify with a
-// big pile of points left unspent. Scales with level automatically.
-export const JOB_COMMIT_RATIO = 0.85;
 
 // Build a fresh profile for a newly chosen base class.
 export function createProfile(classId) {
@@ -71,30 +67,20 @@ export function combatStats(profile) {
   return s;
 }
 
-// Detailed per-job qualification — also returns the numbers the UI shows.
+// Per-job qualification against plain stat-value thresholds (checked on your
+// stats including passives). Returns the requirement rows the UI renders.
 export function jobProgress(profile, job) {
-  const inv = investedPoints(profile);
-  const earned = totalEarnedPoints(profile);
-  const sib = siblingJob(job);
-  const sigInv = inv[job.signature.stat] || 0;
-  const branchInv = inv[job.branch] || 0;
-  const sibBranchInv = sib ? inv[sib.branch] || 0 : 0;
-  const committed = sigInv + branchInv;
-  const needCommit = Math.ceil(earned * JOB_COMMIT_RATIO);
-
+  const stats = statsWithPassives(profile);
   const levelOk = profile.level >= JOB_LEVEL;
-  const favorOk = branchInv > sibBranchInv; // mutually exclusive branch
-  const sigDominant = sigInv >= branchInv; // signature stays the top stat
-  const commitOk = committed >= needCommit;
-
-  return {
-    sib, sigInv, branchInv, sibBranchInv, committed, needCommit, earned,
-    levelOk, favorOk, sigDominant, commitOk,
-    qualifies: levelOk && favorOk && sigDominant && commitOk,
-  };
+  const reqs = Object.entries(job.requires).map(([stat, need]) => ({
+    stat, need, have: stats[stat] || 0, ok: (stats[stat] || 0) >= need,
+  }));
+  const qualifies = levelOk && reqs.every((r) => r.ok);
+  return { levelOk, reqs, qualifies };
 }
 
-// Which of the class's jobs the character currently qualifies for.
+// Class jobs with qualification + active flags (includes hidden jobs; the UI
+// decides whether to reveal them).
 export function jobOptions(profile) {
   return jobsFor(profile.classId).map((job) => ({
     ...job,

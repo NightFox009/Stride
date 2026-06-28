@@ -27,13 +27,14 @@ export default function JobsScreen({ onBack }) {
       <Text style={styles.sub}>
         Advanced paths awaken at level {JOB_LEVEL} when you meet their stat
         requirements. Choosing a job is permanent — switching later needs a Class
-        Change item.
+        Change item. A hidden Luck path reveals itself to those who invest in Luck.
       </Text>
 
-      {options.map((job) => {
+      {options
+        // Hidden Luck jobs only appear once their requirements are met.
+        .filter((job) => !job.hidden || job.qualifies || job.active)
+        .map((job) => {
         const pr = jobProgress(profile, job);
-        const sigName = STAT_NAMES[job.signature.stat];
-        const branchName = STAT_NAMES[job.branch];
         const Row = ({ ok, children }) => (
           <Text style={[styles.favor, ok ? styles.reqOk : styles.reqNo]}>
             {ok ? "✓" : "✗"} {children}
@@ -44,20 +45,21 @@ export default function JobsScreen({ onBack }) {
             <View style={styles.head}>
               <Avatar classId={profile.classId} level={profile.level} job={job.id} size={64} />
               <View style={{ flex: 1, marginLeft: spacing(1.5) }}>
-                <Text style={styles.name}>{job.name}</Text>
+                <Text style={styles.name}>
+                  {job.name}
+                  {job.hidden ? <Text style={styles.hiddenTag}>  ✦ hidden</Text> : null}
+                </Text>
                 <Text style={styles.blurb}>{job.blurb}</Text>
               </View>
             </View>
 
-            <Text style={styles.label}>Requirements</Text>
-            <Row ok={pr.levelOk}>Reach level {JOB_LEVEL}</Row>
-            <Row ok={pr.commitOk}>
-              Commit {pr.committed}/{pr.needCommit} pts into {sigName} + {branchName}
-            </Row>
-            <Row ok={pr.favorOk}>
-              Favor {branchName} over {pr.sib ? STAT_NAMES[pr.sib.branch] : "—"} ({pr.branchInv} vs {pr.sibBranchInv})
-            </Row>
-            <Row ok={pr.sigDominant}>{sigName} is your top stat ({pr.sigInv} ≥ {pr.branchInv})</Row>
+            <Text style={styles.label}>Requirements (level {JOB_LEVEL}+)</Text>
+            <Row ok={pr.levelOk}>Level {JOB_LEVEL} (you are {profile.level})</Row>
+            {pr.reqs.map((r) => (
+              <Row key={r.stat} ok={r.ok}>
+                {STAT_NAMES[r.stat]} {r.have} / {r.need}
+              </Row>
+            ))}
 
             <Text style={styles.label}>Perk</Text>
             <Text style={styles.perk}>
@@ -110,6 +112,7 @@ const styles = StyleSheet.create({
   cardActive: { borderColor: colors.gold },
   head: { flexDirection: "row", alignItems: "center", marginBottom: spacing(1.5) },
   name: { color: colors.text, fontSize: 20, fontWeight: "800" },
+  hiddenTag: { color: colors.gold, fontSize: 12, fontWeight: "700" },
   blurb: { color: colors.textDim, fontSize: 13, marginTop: 2, lineHeight: 18 },
   label: { color: colors.textDim, fontSize: 11, fontWeight: "700", textTransform: "uppercase", marginTop: spacing(1) },
   reqs: { flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5), marginTop: spacing(0.5) },

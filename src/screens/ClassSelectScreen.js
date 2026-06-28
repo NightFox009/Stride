@@ -18,7 +18,6 @@ const TAGLINES = {
   ranger: "Swift and precise, striking before they can react.",
   scholar: "A scholar of devastating arcane power.",
   herald: "An inspiring commander who turns the tide.",
-  wanderer: "Reckless and lucky; fortune favours the bold.",
 };
 
 export default function ClassSelectScreen() {

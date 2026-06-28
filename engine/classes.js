@@ -10,7 +10,8 @@ export const BASE_CLASSES = {
   ranger:   { id: "ranger",   name: "Ranger",   boost: "AGI", skills: ["quick_shot"] },
   scholar:  { id: "scholar",  name: "Scholar",  boost: "INT", skills: ["arcane_bolt"] },
   herald:   { id: "herald",   name: "Herald",   boost: "CHA", skills: ["cutting_words", "rally"] },
-  wanderer: { id: "wanderer", name: "Wanderer", boost: "LUK", skills: ["wild_gamble"] },
+  // Wanderer (LUK) is no longer a starting class — its path lives on as the
+  // hidden Luck job available to every class (see engine/jobs.js).
 };
 
 export function startingStatsFor(classId) {
