@@ -17,9 +17,7 @@ import {
   applyAllocation,
   applyHpRegen,
   vitals,
-  startCamp,
   claimCamp,
-  stopCamp,
   learnSkill,
   awakenJob,
   applyFloorResult,
@@ -49,15 +47,16 @@ export function StrideProvider({ children }) {
   const profileRef = useRef(null);
   profileRef.current = profile;
 
-  // Load the save once on startup (and catch up any offline Energy regen).
+  // Load the save once on startup (and catch up any offline HP/MP regen).
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const saved = await loadProfile();
       if (!cancelled) {
         let init = saved ? applyHpRegen(saved) : saved;
-        // Grant offline idle accrual on return, then keep camping.
-        if (init && init.idle) init = claimCamp(init).profile;
+        // Camping was removed: credit any old save's accrued idle once, then end
+        // the camp for good so the field stops lingering.
+        if (init && init.idle) init = { ...claimCamp(init).profile, idle: null };
         setProfile(init);
         setLoading(false);
       }
@@ -132,9 +131,6 @@ export function StrideProvider({ children }) {
   const sell = useCallback((itemId) => {
     setProfile((p) => (p ? sellItem(p, itemId) : p));
   }, []);
-  const camp = useCallback(() => setProfile((p) => (p ? startCamp(p) : p)), []);
-  const claimIdle = useCallback(() => setProfile((p) => (p ? claimCamp(p).profile : p)), []);
-  const stopIdle = useCallback(() => setProfile((p) => (p ? stopCamp(p).profile : p)), []);
   const upgrade = useCallback((itemId) => {
     setProfile((p) => (p ? upgradeItem(p, itemId) : p));
   }, []);
@@ -172,11 +168,13 @@ export function StrideProvider({ children }) {
   }, []);
 
   // Fold a finished floor's result back into the profile. Returns the level-ups
-  // gained so the screen can celebrate them.
+  // gained so the screen can celebrate them. Updates the ref synchronously so a
+  // continuous descent can immediately begin the next floor on the fresh state.
   const commitFloorResult = useCallback((result) => {
     const p = profileRef.current;
     if (!p) return [];
     const { profile: next, levelsGained } = applyFloorResult(p, result);
+    profileRef.current = next;
     setProfile(next);
     return levelsGained;
   }, []);
@@ -199,9 +197,6 @@ export function StrideProvider({ children }) {
     sell,
     upgrade,
     craft,
-    camp,
-    claimIdle,
-    stopIdle,
     beginFloorSession,
     commitFloorResult,
   };

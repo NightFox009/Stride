@@ -1,7 +1,9 @@
-// Dungeon: descend freely (no energy), then fight the floor turn by turn —
-// choose Attack, a skill, or flee each turn, pick your target, and read the log.
-// The engine session (engine/dungeonSession.js) holds combat state; this screen
-// renders snapshots and forwards the player's choices.
+// Dungeon: a continuous, idle-style descent. Tap Descend and your character
+// auto-fights floor after floor, carrying HP/MP onward, until they fall (or you
+// retreat). Each cleared floor banks its rewards immediately. The engine session
+// (engine/dungeonSession.js) holds combat state; this screen renders snapshots
+// and drives the auto-descent loop. (Combat is auto today; this is the seam
+// where a future graphical idle battler will plug in.)
 
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
@@ -10,18 +12,21 @@ import { floorType } from "../../engine/floors.js";
 import { zoneName } from "../../engine/zones.js";
 import { RARITIES, statLabel } from "../../engine/items.js";
 import { MATERIALS } from "../../engine/crafting.js";
-import { idlePreview } from "../game/profile.js";
 import ProgressBar from "../components/ProgressBar.js";
 import { colors, spacing } from "../theme.js";
 
 const FLOOR_BLURB = {
   combat: "Combat — 10 waves of monsters.",
   elite: "Elite — a single dangerous foe.",
-  boss: "Boss — 9 waves, then the warlord. Bring your best.",
+  boss: "Boss — 9 waves, then the warlord.",
   treasure: "Treasure — no fight, just loot.",
   rest: "Rest — recover and move on.",
 };
 const COMBAT_FLOORS = new Set(["combat", "elite", "boss"]);
+
+function emptyRun(floor) {
+  return { startFloor: floor, deepest: floor, floorsCleared: 0, xp: 0, gold: 0, loot: [], levels: [] };
+}
 
 function formatEvent(e, playerName = "You") {
   switch (e.type) {
@@ -41,14 +46,12 @@ function formatEvent(e, playerName = "You") {
     case "buff": return { text: `${e.target} raises ${e.buff}`, tone: "good" };
     case "stunnedSkip": return { text: `${e.actor} is stunned!`, tone: "good" };
     case "outOfMp": return { text: `Out of MP for ${e.skill}`, tone: "dim" };
-    case "flee": return { text: e.success ? "Fled the battle!" : "Failed to flee!", tone: "dim" };
     case "waveCleared": return { text: `Wave ${e.wave} cleared (+${e.xp} XP, +${e.gold}g)`, tone: "good" };
     case "recover": return { text: `Recovered +${e.hp} HP, +${e.mp} MP`, tone: "dim" };
     case "treasure": return { text: `Found ${e.gold} gold!`, tone: "gold" };
     case "rest": return { text: "Rested — fully recovered.", tone: "good" };
     case "floorCleared": return { text: `Floor cleared! +${e.awardedXp} XP, +${e.gold}g`, tone: "head" };
-    case "floorDefeat": return { text: `Defeated on wave ${e.wave}. EXP halved, loot lost.`, tone: "bad" };
-    case "floorFled": return { text: `Fled on wave ${e.wave}.`, tone: "bad" };
+    case "floorDefeat": return { text: `Defeated on wave ${e.wave}.`, tone: "bad" };
     default: return null;
   }
 }
@@ -59,75 +62,136 @@ const TONE_COLOR = {
 };
 
 export default function DungeonScreen({ onBack }) {
-  const { profile, vitals, beginFloorSession, commitFloorResult, camp, claimIdle, stopIdle } = useStride();
+  const { profile, vitals, beginFloorSession, commitFloorResult } = useStride();
   const sessionRef = useRef(null);
-  const committedRef = useRef(false);
+  const committedRef = useRef(false); // current session's result already banked?
+  const runRef = useRef(null); // accumulated totals across the descent
   const [, setTick] = useState(0);
-  const [target, setTarget] = useState(0);
-  const [levelsGained, setLevelsGained] = useState([]);
-  const [autoOn, setAutoOn] = useState(false);
+  const [ended, setEnded] = useState(null);
   const rerender = () => setTick((t) => t + 1);
 
   const snap = sessionRef.current ? sessionRef.current.snapshot() : null;
+  const running = !!snap;
 
-  // Commit rewards once the floor ends.
+  // Continuous auto-descent loop. Every tick: take an auto turn if it's our move;
+  // when a floor ends, bank it and either drop to the next floor (on a clear) or
+  // end the run (on death). Instant floors (treasure/rest) flow straight through.
   useEffect(() => {
-    if (snap && snap.result && !committedRef.current) {
-      committedRef.current = true;
-      setLevelsGained(commitFloorResult(snap.result));
-    }
-  });
-
-  // Auto-battle: while on and still fighting, take one turn every tick.
-  useEffect(() => {
-    if (!autoOn || !sessionRef.current) return;
-    if (snap?.phase !== "fighting") return;
     const id = setInterval(() => {
       const s = sessionRef.current;
       if (!s) return;
       const sn = s.snapshot();
-      if (sn.phase !== "fighting" || !sn.awaiting) return;
-      s.autoStep();
+      if (sn.phase === "fighting") {
+        if (sn.awaiting) { s.autoStep(); rerender(); }
+        return;
+      }
+      if (committedRef.current) return; // already handled this floor's end
+      committedRef.current = true;
+
+      const r = sn.result || {};
+      const gains = commitFloorResult(r);
+      const run = runRef.current;
+      if (run) {
+        run.xp += r.xp || 0;
+        run.gold += r.gold || 0;
+        if (r.loot?.length) run.loot.push(...r.loot);
+        if (gains?.length) run.levels.push(...gains);
+        if (r.outcome === "cleared") { run.floorsCleared += 1; run.deepest = r.floor; }
+      }
+
+      if (r.outcome === "cleared") {
+        const next = beginFloorSession(); // reads the freshly advanced floor + carried HP
+        if (next) { sessionRef.current = next; committedRef.current = false; rerender(); return; }
+      }
+      // The run is over: died, fled, or the next floor couldn't start.
+      setEnded({ outcome: r.outcome, floor: sn.floor, log: sn.log, run: { ...(runRef.current || emptyRun(sn.floor)) } });
+      sessionRef.current = null;
       rerender();
-    }, 320);
+    }, 280);
     return () => clearInterval(id);
-  }, [autoOn, snap?.phase]);
+  }, [beginFloorSession, commitFloorResult]);
 
   const floor = profile.floor || 1;
   const type = floorType(floor);
   const hasUnspent = profile.statPoints > 0;
 
-  const descend = () => {
+  const startDescent = () => {
     const s = beginFloorSession();
     if (!s) return;
+    runRef.current = emptyRun(floor);
+    committedRef.current = false;
     sessionRef.current = s;
-    committedRef.current = false;
-    setLevelsGained([]);
-    setTarget(0);
+    setEnded(null);
     rerender();
   };
 
-  const leave = () => {
+  const retreat = () => {
+    const s = sessionRef.current;
+    const sn = s ? s.snapshot() : null;
+    committedRef.current = true; // abandon the in-progress floor (no reward for it)
+    setEnded({ outcome: "retreat", floor: sn ? sn.floor : floor, log: sn ? sn.log : [], run: { ...(runRef.current || emptyRun(floor)) } });
     sessionRef.current = null;
-    committedRef.current = false;
     rerender();
   };
 
-  // ── No active run: floor briefing ──
-  if (!snap) {
+  const leave = () => { setEnded(null); rerender(); };
+
+  // ── Run finished: summary ──
+  if (ended) {
+    const r = ended.run;
+    const died = ended.outcome === "defeat";
+    const title = died
+      ? `You fell on Floor ${ended.floor}`
+      : ended.outcome === "retreat"
+      ? `Retreated from Floor ${ended.floor}`
+      : `Run ended on Floor ${ended.floor}`;
+    return (
+      <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+        <Text style={styles.title}>Descent Report</Text>
+        <View style={styles.card}>
+          <Text style={[styles.outcome, { color: died ? colors.danger : colors.accent }]}>{title}</Text>
+          <Text style={styles.rewardLine}>
+            {r.floorsCleared} floor{r.floorsCleared === 1 ? "" : "s"} cleared   ·   +{r.xp} XP   ·   +{r.gold} gold
+          </Text>
+          {r.levels.length > 0 && (
+            <Text style={styles.levelUp}>★ Level up → {r.levels[r.levels.length - 1].level}!</Text>
+          )}
+          {r.loot.length > 0 && (
+            <View style={styles.loot}>
+              <Text style={styles.lootTitle}>Loot collected ({r.loot.length})</Text>
+              {r.loot.map((it) => (
+                <Text key={it.id} style={[styles.lootItem, { color: RARITIES[it.rarity]?.color }]}>
+                  {it.name} — {Object.entries(it.mods).map(([s, v]) => `+${v} ${statLabel(s)}`).join(", ")}
+                </Text>
+              ))}
+            </View>
+          )}
+          {died && <Text style={styles.note}>You respawn at full HP on Floor {profile.floor || 1}. Train up and dive again.</Text>}
+          <Pressable onPress={leave} style={({ pressed }) => [styles.descend, pressed && styles.pressed, { backgroundColor: colors.accent, marginTop: spacing(2) }]}>
+            <Text style={[styles.descendText, { color: colors.bg }]}>Return</Text>
+          </Pressable>
+        </View>
+        <Log events={ended.log} tail={14} />
+      </ScrollView>
+    );
+  }
+
+  // ── No active run: briefing ──
+  if (!running) {
     return (
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
         <Pressable onPress={onBack} style={styles.back}><Text style={styles.backText}>← Home</Text></Pressable>
         <Text style={styles.title}>Dungeon</Text>
         <View style={styles.card}>
-          <View style={styles.rowBetween}>
-            <Text style={styles.floorNum}>Floor {floor}</Text>
-          </View>
+          <Text style={styles.floorNum}>Floor {floor}</Text>
           <Text style={styles.zone}>{zoneName(floor)}</Text>
           <Text style={styles.blurb}>{FLOOR_BLURB[type] ?? type}</Text>
           <Text style={styles.vitals}>
             HP {vitals.hp}/{vitals.maxHP}   ·   MP {vitals.mp}/{vitals.maxMP}
-            {vitals.hp < vitals.maxHP * 0.5 ? "  — consider recovering first" : ""}
+          </Text>
+          <Text style={styles.blurb}>
+            Your character descends on their own — auto-fighting each floor and
+            pressing deeper until they fall. Every floor cleared is banked.
           </Text>
 
           {hasUnspent && COMBAT_FLOORS.has(type) && (
@@ -141,93 +205,19 @@ export default function DungeonScreen({ onBack }) {
           )}
 
           <Pressable
-            onPress={descend}
+            onPress={startDescent}
             style={({ pressed }) => [styles.descend, pressed && styles.pressed]}
           >
             <Text style={styles.descendText}>Descend</Text>
           </Pressable>
         </View>
-
-        {/* Idle / camp — stuck on a floor? Camp it for passive EXP + cores. */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Camp (idle)</Text>
-          {profile.idle ? (
-            (() => {
-              const pv = idlePreview(profile);
-              return (
-                <>
-                  <Text style={styles.blurb}>
-                    Camping Floor {profile.idle.floor} · {pv.minutes} min accrued{pv.capped ? " (max)" : ""}
-                    {"\n"}+{pv.xp} EXP, {Object.values(pv.cores).reduce((a, b) => a + b, 0)} cores waiting
-                  </Text>
-                  <View style={styles.campRow}>
-                    <Pressable onPress={claimIdle} style={[styles.campBtn, { backgroundColor: colors.accent }]}>
-                      <Text style={[styles.campBtnText, { color: colors.bg }]}>Claim</Text>
-                    </Pressable>
-                    <Pressable onPress={stopIdle} style={styles.campBtn}>
-                      <Text style={styles.campBtnText}>Stop</Text>
-                    </Pressable>
-                  </View>
-                </>
-              );
-            })()
-          ) : (
-            <>
-              <Text style={styles.blurb}>Stuck? Camp this floor to passively earn EXP and monster cores over time (up to 8h offline).</Text>
-              <Pressable onPress={camp} style={[styles.campBtn, { backgroundColor: colors.exp, marginTop: spacing(1.5) }]}>
-                <Text style={[styles.campBtnText, { color: colors.bg }]}>Camp Floor {floor}</Text>
-              </Pressable>
-            </>
-          )}
-        </View>
       </ScrollView>
     );
   }
 
-  // ── Run finished: result ──
-  if (snap.phase !== "fighting") {
-    const r = snap.result || {};
-    const cleared = r.outcome === "cleared";
-    return (
-      <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Dungeon</Text>
-        <View style={styles.card}>
-          <Text style={[styles.outcome, { color: cleared ? colors.accent : colors.danger }]}>
-            {cleared ? "Floor cleared!" : r.outcome === "fled" ? "You fled — the run is lost." : "You fell in the dungeon."}
-          </Text>
-          <Text style={styles.rewardLine}>+{r.xp || 0} XP   ·   +{r.gold || 0} gold</Text>
-          {levelsGained.length > 0 && (
-            <Text style={styles.levelUp}>★ Level up → {levelsGained[levelsGained.length - 1].level}!</Text>
-          )}
-          {r.loot && r.loot.length > 0 && (
-            <View style={styles.loot}>
-              <Text style={styles.lootTitle}>Loot dropped!</Text>
-              {r.loot.map((it) => (
-                <Text key={it.id} style={[styles.lootItem, { color: RARITIES[it.rarity]?.color }]}>
-                  {it.name} — {Object.entries(it.mods).map(([s, v]) => `+${v} ${statLabel(s)}`).join(", ")}
-                </Text>
-              ))}
-            </View>
-          )}
-          {r.materials && Object.keys(r.materials).length > 0 && (
-            <Text style={styles.mats}>
-              Materials: {Object.entries(r.materials).map(([k, q]) => `${q}× ${MATERIALS[k]?.name}`).join(", ")}
-            </Text>
-          )}
-          <Pressable onPress={leave} style={({ pressed }) => [styles.descend, pressed && styles.pressed, { backgroundColor: colors.accent, marginTop: spacing(2) }]}>
-            <Text style={[styles.descendText, { color: colors.bg }]}>Return</Text>
-          </Pressable>
-        </View>
-        <Log events={snap.log} />
-      </ScrollView>
-    );
-  }
-
-  // ── Fighting ──
-  const liveTarget = snap.enemies[target]?.alive ? target : snap.enemies.findIndex((e) => e.alive);
+  // ── Descending: live auto-fight ──
   const { player } = snap;
-  const menu = sessionRef.current.skillMenu;
-
+  const run = runRef.current || emptyRun(floor);
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.rowBetween}>
@@ -238,24 +228,22 @@ export default function DungeonScreen({ onBack }) {
         <Text style={styles.waveTag}>Wave {snap.wave}/{snap.totalWaves}</Text>
       </View>
 
+      <View style={styles.runBar}>
+        <Text style={styles.runText}>▼ Descending — auto</Text>
+        <Text style={styles.runText}>{run.floorsCleared} cleared · +{run.xp} XP · +{run.gold}g</Text>
+      </View>
+
       {/* Enemies */}
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Enemies — tap to target</Text>
+        <Text style={styles.sectionTitle}>Enemies</Text>
         {snap.enemies.map((e) => (
-          <Pressable
-            key={e.index}
-            disabled={!e.alive}
-            onPress={() => setTarget(e.index)}
-            style={[styles.enemyRow, e.index === liveTarget && e.alive && styles.enemyTargeted, !e.alive && styles.enemyDead]}
-          >
-            <Text style={[styles.enemyName, !e.alive && styles.struck]}>
-              {e.index === liveTarget && e.alive ? "▶ " : ""}{e.name}
-            </Text>
+          <View key={e.index} style={[styles.enemyRow, !e.alive && styles.enemyDead]}>
+            <Text style={[styles.enemyName, !e.alive && styles.struck]}>{e.name}</Text>
             <View style={styles.enemyBarWrap}>
               <View style={[styles.enemyBar, { width: `${Math.max(0, (e.hp / e.maxHP) * 100)}%` }]} />
             </View>
             <Text style={styles.enemyHp}>{e.hp}</Text>
-          </Pressable>
+          </View>
         ))}
       </View>
 
@@ -265,54 +253,12 @@ export default function DungeonScreen({ onBack }) {
         <ProgressBar label="MP" value={player.mp} max={player.maxMP} color={colors.exp} />
       </View>
 
-      {/* Auto toggle */}
-      <Pressable
-        onPress={() => setAutoOn((v) => !v)}
-        style={[styles.auto, autoOn && styles.autoOn]}
-      >
-        <Text style={[styles.autoText, autoOn && styles.autoTextOn]}>
-          {autoOn ? "■ Auto-battling… (tap to take control)" : "▶ Auto-battle"}
-        </Text>
+      <Pressable onPress={retreat} style={({ pressed }) => [styles.retreat, pressed && styles.pressed]}>
+        <Text style={styles.retreatText}>Retreat — bank cleared floors</Text>
       </Pressable>
-
-      {/* Actions */}
-      <View style={styles.actions}>
-        <ActionBtn label="Attack" disabled={autoOn} onPress={() => { sessionRef.current.attack(liveTarget); rerender(); }} />
-        {menu.map((sk) => {
-          const disabled = autoOn || player.mp < sk.cost;
-          return (
-            <ActionBtn
-              key={sk.id}
-              label={`${sk.name}${sk.level > 1 ? ` Lv${sk.level}` : ""}`}
-              sub={`${sk.cost} MP`}
-              disabled={disabled}
-              onPress={() => { sessionRef.current.skill(sk.id, liveTarget); rerender(); }}
-            />
-          );
-        })}
-        <ActionBtn label="Flee" sub="forfeit run" tone="danger" disabled={autoOn} onPress={() => { sessionRef.current.flee(); rerender(); }} />
-      </View>
 
       <Log events={snap.log} tail={10} />
     </ScrollView>
-  );
-}
-
-function ActionBtn({ label, sub, onPress, disabled, tone }) {
-  return (
-    <Pressable
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.action,
-        tone === "danger" && styles.actionDanger,
-        disabled && styles.btnDisabled,
-        pressed && !disabled && styles.pressed,
-      ]}
-    >
-      <Text style={[styles.actionText, disabled && styles.actionTextDisabled]}>{label}</Text>
-      {sub ? <Text style={styles.actionSub}>{sub}</Text> : null}
-    </Pressable>
   );
 }
 
@@ -342,7 +288,7 @@ const styles = StyleSheet.create({
   },
   floorNum: { color: colors.text, fontSize: 22, fontWeight: "800" },
   zone: { color: colors.gold, fontSize: 13, fontWeight: "700", marginTop: 2 },
-  blurb: { color: colors.textDim, fontSize: 14, marginTop: spacing(0.5), lineHeight: 20 },
+  blurb: { color: colors.textDim, fontSize: 14, marginTop: spacing(0.75), lineHeight: 20 },
   vitals: { color: colors.hp, fontSize: 13, marginTop: spacing(0.75), fontWeight: "600" },
   nudge: {
     marginTop: spacing(1.5), backgroundColor: colors.surfaceAlt, borderRadius: 10,
@@ -354,46 +300,35 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(1.75), alignItems: "center",
   },
   descendText: { color: colors.text, fontSize: 16, fontWeight: "800" },
-  btnDisabled: { backgroundColor: colors.surfaceAlt, opacity: 0.7 },
   pressed: { opacity: 0.85 },
-  note: { color: colors.textDim, fontSize: 12, marginTop: spacing(1), textAlign: "center" },
+  note: { color: colors.textDim, fontSize: 12, marginTop: spacing(1.5), textAlign: "center", lineHeight: 18 },
   outcome: { fontSize: 20, fontWeight: "800" },
   rewardLine: { color: colors.textDim, fontSize: 14, marginTop: spacing(0.5) },
   levelUp: { color: colors.gold, fontSize: 14, fontWeight: "700", marginTop: spacing(0.5) },
   loot: { marginTop: spacing(1.5), borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing(1) },
   lootTitle: { color: colors.text, fontSize: 14, fontWeight: "800", marginBottom: spacing(0.5) },
   lootItem: { fontSize: 13, fontWeight: "700", lineHeight: 19 },
-  mats: { color: colors.textDim, fontSize: 12, marginTop: spacing(0.5) },
   sectionTitle: { color: colors.textDim, fontSize: 12, fontWeight: "700", marginBottom: spacing(1), textTransform: "uppercase" },
-  campRow: { flexDirection: "row", gap: spacing(1), marginTop: spacing(1.5) },
-  campBtn: { flex: 1, alignItems: "center", paddingVertical: spacing(1.25), borderRadius: 10, backgroundColor: colors.surfaceAlt },
-  campBtnText: { color: colors.text, fontWeight: "800", fontSize: 14 },
+  runBar: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    backgroundColor: colors.surfaceAlt, borderRadius: 10, paddingVertical: spacing(1),
+    paddingHorizontal: spacing(1.5), marginBottom: spacing(1.5),
+  },
+  runText: { color: colors.accent, fontSize: 13, fontWeight: "800" },
   enemyRow: {
     flexDirection: "row", alignItems: "center", paddingVertical: spacing(0.75),
-    paddingHorizontal: spacing(1), borderRadius: 8, borderWidth: 1, borderColor: "transparent", marginBottom: 4,
+    paddingHorizontal: spacing(1), borderRadius: 8, marginBottom: 4,
   },
-  enemyTargeted: { borderColor: colors.danger, backgroundColor: colors.surfaceAlt },
   enemyDead: { opacity: 0.4 },
-  enemyName: { color: colors.text, fontSize: 14, fontWeight: "600", width: 96 },
+  enemyName: { color: colors.text, fontSize: 14, fontWeight: "600", width: 110 },
   struck: { textDecorationLine: "line-through" },
   enemyBarWrap: { flex: 1, height: 8, borderRadius: 4, backgroundColor: colors.surfaceAlt, overflow: "hidden", marginHorizontal: spacing(1) },
   enemyBar: { height: "100%", backgroundColor: colors.hp },
   enemyHp: { color: colors.textDim, fontSize: 12, width: 34, textAlign: "right", fontVariant: ["tabular-nums"] },
-  auto: {
+  retreat: {
     backgroundColor: colors.surfaceAlt, borderRadius: 10, paddingVertical: spacing(1.25),
-    alignItems: "center", marginBottom: spacing(1), borderWidth: 1, borderColor: colors.border,
+    alignItems: "center", marginBottom: spacing(1.5), borderWidth: 1, borderColor: colors.border,
   },
-  autoOn: { backgroundColor: colors.exp, borderColor: colors.exp },
-  autoText: { color: colors.exp, fontSize: 14, fontWeight: "800" },
-  autoTextOn: { color: colors.bg },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing(1), marginBottom: spacing(1.5) },
-  action: {
-    backgroundColor: colors.surfaceAlt, borderRadius: 10, paddingVertical: spacing(1.25),
-    paddingHorizontal: spacing(2), alignItems: "center", minWidth: 96, flexGrow: 1,
-  },
-  actionDanger: { borderWidth: 1, borderColor: colors.danger },
-  actionText: { color: colors.text, fontSize: 15, fontWeight: "700" },
-  actionTextDisabled: { color: colors.textDim },
-  actionSub: { color: colors.textDim, fontSize: 11, marginTop: 2 },
+  retreatText: { color: colors.textDim, fontSize: 14, fontWeight: "800" },
   logLine: { fontSize: 13, lineHeight: 19, fontVariant: ["tabular-nums"] },
 });
