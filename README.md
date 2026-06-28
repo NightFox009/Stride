@@ -53,7 +53,8 @@ engine/
   stats.js        7 stats + derived-stat formulas
   classes.js      base classes (+1 stat) and hidden classes (unlock at 1000)
   skills.js       starter skill set
-  enemies.js      starter enemy roster + a boss, with depth scaling
+  enemies.js      enemy roster (archetypes: swift/brute/tank/trickster…)
+  zones.js        10 biome zones, each with its own pool, elite & boss
   combat.js       turn-based combat engine (events out, no printing)
   floors.js       100-floor layout, 10-wave combat floors, energy cost
   progression.js  EXP curve, stat points, steps -> EXP/Energy
@@ -80,5 +81,5 @@ times and reports clear rates so balance is driven by data, not guesswork.
 ## Next
 
 Balance pass ✓ → Expo app shell ✓ → in-app dungeon UI ✓ → avatar evolution art ✓
-→ shop & equipment / enemy variety → background step sync (HealthKit / Health
-Connect) → cloud sync, more classes.
+→ advanced jobs ✓ → enemy/biome variety ✓ → shop & equipment / class-change item
+→ background step sync (HealthKit / Health Connect) → cloud sync, more classes.

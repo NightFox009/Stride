@@ -7,6 +7,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { useStride } from "../state/StrideContext.js";
 import { floorType } from "../../engine/floors.js";
+import { zoneName } from "../../engine/zones.js";
 import ProgressBar from "../components/ProgressBar.js";
 import { colors, spacing } from "../theme.js";
 
@@ -120,6 +121,7 @@ export default function DungeonScreen({ onBack }) {
             <Text style={styles.floorNum}>Floor {floor}</Text>
             <Text style={styles.energy}>{profile.energy}⚡</Text>
           </View>
+          <Text style={styles.zone}>{zoneName(floor)}</Text>
           <Text style={styles.blurb}>{FLOOR_BLURB[type] ?? type}</Text>
 
           {hasUnspent && COMBAT_FLOORS.has(type) && (
@@ -181,7 +183,10 @@ export default function DungeonScreen({ onBack }) {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.rowBetween}>
-        <Text style={styles.title}>Floor {snap.floor}</Text>
+        <View>
+          <Text style={styles.title}>Floor {snap.floor}</Text>
+          <Text style={styles.zone}>{zoneName(snap.floor)}</Text>
+        </View>
         <Text style={styles.waveTag}>Wave {snap.wave}/{snap.totalWaves}</Text>
       </View>
 
@@ -289,6 +294,7 @@ const styles = StyleSheet.create({
   },
   floorNum: { color: colors.text, fontSize: 22, fontWeight: "800" },
   energy: { color: colors.accent, fontSize: 18, fontWeight: "700" },
+  zone: { color: colors.gold, fontSize: 13, fontWeight: "700", marginTop: 2 },
   blurb: { color: colors.textDim, fontSize: 14, marginTop: spacing(0.5), lineHeight: 20 },
   nudge: {
     marginTop: spacing(1.5), backgroundColor: colors.surfaceAlt, borderRadius: 10,
