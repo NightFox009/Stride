@@ -8,7 +8,7 @@
 //
 // A UI renders the emitted events — the engine itself never prints.
 
-import { derive } from "./stats.js";
+import { derive, MIN_HIT_CHANCE } from "./stats.js";
 import { SKILLS } from "./skills.js";
 import { createRng } from "./rng.js";
 
@@ -35,14 +35,22 @@ const isAlive = (c) => c.hp > 0;
 
 // Core damage application — shared by attacks and skills.
 function dealDamage(rng, attacker, target, rawAmount, type, opts = {}) {
-  const dodge = derive.dodgeChance(target.stats);
-  if (rng.chance(dodge)) {
-    return { type: "dodge", attacker: attacker.name, target: target.name };
+  // Hit check: the attacker's Accuracy vs the target's Evasion. Monsters with
+  // high Evasion make your attacks miss unless you have the Accuracy to land.
+  const hitChance = Math.max(
+    MIN_HIT_CHANCE,
+    derive.accuracy(attacker.stats) - derive.evasion(target.stats)
+  );
+  if (!rng.chance(hitChance)) {
+    return { type: "miss", attacker: attacker.name, target: target.name };
   }
   let amount = rawAmount;
   const crit = derive.critChance(attacker.stats) + (opts.critBonus || 0);
   const isCrit = rng.chance(crit);
   if (isCrit) amount *= derive.critMult(attacker.stats);
+  // Mitigation: physical hits are reduced by Defense, magic by Magic Defense.
+  const def = type === "magic" ? derive.magicDefense(target.stats) : derive.defense(target.stats);
+  amount *= 100 / (100 + Math.max(0, def));
   if (target.guard) amount *= 0.5;
   amount = Math.max(1, Math.round(amount));
   target.hp = Math.max(0, target.hp - amount);

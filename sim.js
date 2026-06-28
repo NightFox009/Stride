@@ -51,7 +51,8 @@ hr();
 line(`AVATAR — ${cls.name}  (boost: ${cls.boost})`);
 line(`  Stats: ${Object.entries(stats).map(([k, v]) => `${k} ${v}`).join("  ")}`);
 line(`  HP ${derive.maxHP(stats)}  MP ${derive.maxMP(stats)}  ` +
-     `Crit ${derive.critChance(stats)}%  Dodge ${derive.dodgeChance(stats)}%`);
+     `DEF ${derive.defense(stats)}  MDEF ${derive.magicDefense(stats)}  ` +
+     `Crit ${derive.critChance(stats)}%  Eva ${derive.evasion(stats)}%  Acc ${derive.accuracy(stats)}%`);
 line(`  Skills: ${playerSkills.map((s) => SKILLS[s].name).join(", ")}`);
 const unlocked = unlockedHiddenClasses(stats);
 line(`  Hidden classes unlocked: ${unlocked.length ? unlocked.map((h) => h.name).join(", ") : "none yet"}`);
@@ -83,6 +84,7 @@ function render(events) {
              `${e.killed ? "  [DOWN]" : ""}`);
         break;
       case "dodge": line(`    ${e.target} dodged ${e.attacker}'s attack!`); break;
+      case "miss": line(`    ${e.attacker} missed ${e.target}!`); break;
       case "heal": line(`    ${e.target} heals ${e.amount} -> HP ${e.targetHp}`); break;
       case "status": line(`    ${e.target} is ${e.status}!`); break;
       case "stunnedSkip": line(`    ${e.actor} is stunned and loses a turn.`); break;

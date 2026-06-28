@@ -146,9 +146,14 @@ export function deriveSheet(profile) {
     maxHP: derive.maxHP(s) + levelHpBonus(profile.level) + (kb.hp || 0),
     maxMP: derive.maxMP(s),
     attack: derive.attack(s, primaryStatOf(profile)),
+    defense: derive.defense(s),
+    magicAttack: derive.magicAttack(s),
+    magicDefense: derive.magicDefense(s),
     skillPower: derive.skillPower(s),
     critChance: derive.critChance(s),
     critMult: derive.critMult(s), // crit damage multiplier
+    evasion: derive.evasion(s),
+    accuracy: derive.accuracy(s),
     dodgeChance: derive.dodgeChance(s),
     fleeChance: derive.fleeChance(s),
     speed: derive.speed(s), // initiative / attack speed

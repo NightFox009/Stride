@@ -35,6 +35,7 @@ function formatEvent(e, playerName = "You") {
       return { text: `${e.attacker} hits ${e.target} for ${e.amount}${crit}${kill}`, tone: e.crit ? "crit" : toPlayer ? "hurt" : "hit" };
     }
     case "dodge": return { text: `${e.target} dodges ${e.attacker}`, tone: "dim" };
+    case "miss": return { text: `${e.attacker} misses ${e.target}`, tone: "dim" };
     case "heal": return { text: `${e.target} heals ${e.amount}`, tone: "good" };
     case "status": return { text: `${e.target} is ${e.status}`, tone: "good" };
     case "buff": return { text: `${e.target} raises ${e.buff}`, tone: "good" };

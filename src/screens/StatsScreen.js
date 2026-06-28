@@ -56,16 +56,21 @@ export default function StatsScreen({ onBack, onOpenSkills, onOpenJobs }) {
   };
   const pv = deriveSheet(previewProfile);
   const sheetRows = [
-    { k: "Max HP", v: pv.maxHP, d: pv.maxHP - sheet.maxHP },
-    { k: "Max MP", v: pv.maxMP, d: pv.maxMP - sheet.maxMP },
-    { k: "HP Regen / floor", v: pv.hpRegen, d: pv.hpRegen - sheet.hpRegen },
+    { k: "HP", v: pv.maxHP, d: pv.maxHP - sheet.maxHP },
+    { k: "MP", v: pv.maxMP, d: pv.maxMP - sheet.maxMP },
     { k: "Attack", v: pv.attack, d: pv.attack - sheet.attack },
-    { k: "Skill Power", v: pv.skillPower, d: pv.skillPower - sheet.skillPower },
-    { k: "Crit Chance", v: pv.critChance, d: pv.critChance - sheet.critChance, pct: true },
+    { k: "Defense", v: pv.defense, d: pv.defense - sheet.defense },
+    { k: "Magic Attack", v: pv.magicAttack, d: pv.magicAttack - sheet.magicAttack },
+    { k: "Magic Defense", v: pv.magicDefense, d: pv.magicDefense - sheet.magicDefense },
+    { k: "Speed", v: pv.speed, d: pv.speed - sheet.speed },
+    { k: "Evasion", v: pv.evasion, d: pv.evasion - sheet.evasion, pct: true },
+    { k: "Accuracy", v: pv.accuracy, d: pv.accuracy - sheet.accuracy, pct: true },
+    { k: "Critical", v: pv.critChance, d: pv.critChance - sheet.critChance, pct: true },
+    // Extra detail below the core ten.
     { k: "Crit Damage", v: pv.critMult, d: pv.critMult - sheet.critMult, mult: true },
-    { k: "Dodge Chance", v: pv.dodgeChance, d: pv.dodgeChance - sheet.dodgeChance, pct: true },
+    { k: "Skill Power", v: pv.skillPower, d: pv.skillPower - sheet.skillPower },
+    { k: "HP Regen / floor", v: pv.hpRegen, d: pv.hpRegen - sheet.hpRegen },
     { k: "Flee Chance", v: pv.fleeChance, d: pv.fleeChance - sheet.fleeChance, pct: true },
-    { k: "Attack Speed", v: pv.speed, d: pv.speed - sheet.speed },
   ];
 
   return (
