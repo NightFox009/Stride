@@ -5,9 +5,9 @@
 import React, { useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { BASE_CLASSES, startingStatsFor } from "../../engine/classes.js";
-import { STATS } from "../../engine/stats.js";
+import { STATS, STAT_NAMES } from "../../engine/stats.js";
 import { useStride } from "../state/StrideContext.js";
-import PieChart from "../components/PieChart.js";
+import RadarChart from "../components/RadarChart.js";
 import { colors, spacing, STAT_COLORS } from "../theme.js";
 
 // Flavour only — hints at playstyle without naming the stat it favours.
@@ -28,8 +28,9 @@ export default function ClassSelectScreen() {
 
   const selected = BASE_CLASSES[selectedId];
   const stats = startingStatsFor(selectedId);
-  const pieData = STATS.map((stat) => ({
+  const radarData = STATS.map((stat) => ({
     key: stat,
+    label: STAT_NAMES[stat],
     value: stats[stat],
     color: STAT_COLORS[stat],
     emphasized: stat === selected.boost,
@@ -45,7 +46,7 @@ export default function ClassSelectScreen() {
 
       {/* Affinity preview */}
       <View style={styles.preview}>
-        <PieChart data={pieData} size={210} />
+        <RadarChart data={radarData} size={280} />
         <Text style={styles.previewName}>{selected.name}</Text>
         <Text style={styles.previewTag}>{TAGLINES[selectedId]}</Text>
       </View>
