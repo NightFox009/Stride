@@ -79,6 +79,6 @@ times and reports clear rates so balance is driven by data, not guesswork.
 
 ## Next
 
-Balance pass ✓ → Expo app shell ✓ → in-app dungeon UI ✓ → graphical avatar /
-evolution art → background step sync (HealthKit / Health Connect) → cloud sync,
-more classes.
+Balance pass ✓ → Expo app shell ✓ → in-app dungeon UI ✓ → avatar evolution art ✓
+→ shop & equipment / enemy variety → background step sync (HealthKit / Health
+Connect) → cloud sync, more classes.

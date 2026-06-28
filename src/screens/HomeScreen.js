@@ -8,9 +8,11 @@ import { useStride } from "../state/StrideContext.js";
 import { useStepSource } from "../steps/useStepSource.js";
 import { unlockedHiddenClasses } from "../../engine/classes.js";
 import ProgressBar from "../components/ProgressBar.js";
-import Avatar from "../components/Avatar.js";
+import Avatar, { evolutionStage, STAGE_TITLES } from "../components/Avatar.js";
 import { conversionPreview, msToNextEnergy, MAX_ENERGY } from "../game/profile.js";
 import { colors, spacing } from "../theme.js";
+
+const STAGE_THRESHOLDS = [10, 20, 30, 50];
 
 function regenLabel(profile) {
   if ((profile.energy || 0) >= MAX_ENERGY) return "Energy full";
@@ -32,11 +34,19 @@ export default function HomeScreen({ onOpenStats, onOpenDungeon }) {
       {/* Avatar / identity */}
       <View style={[styles.card, styles.identityCard]}>
         <View style={styles.avatar}>
-          <Avatar classId={profile.classId} level={profile.level} size={64} />
+          <Avatar classId={profile.classId} level={profile.level} size={76} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.className}>{profile.className}</Text>
           <Text style={styles.level}>Level {profile.level}</Text>
+          <Text style={styles.stage}>
+            ✦ {STAGE_TITLES[evolutionStage(profile.level)]}
+            {evolutionStage(profile.level) < 4 && (
+              <Text style={styles.stageNext}>
+                {"  ·  next at Lv " + STAGE_THRESHOLDS[evolutionStage(profile.level)]}
+              </Text>
+            )}
+          </Text>
           {hidden.length > 0 && (
             <Text style={styles.hidden}>
               ✦ {hidden.map((h) => h.name).join(", ")}
@@ -162,17 +172,18 @@ const styles = StyleSheet.create({
   },
   identityCard: { flexDirection: "row", alignItems: "center" },
   avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     backgroundColor: colors.surfaceAlt,
     alignItems: "center",
     justifyContent: "center",
     marginRight: spacing(2),
   },
-  avatarGlyph: { fontSize: 32 },
   className: { color: colors.text, fontSize: 20, fontWeight: "800" },
   level: { color: colors.textDim, fontSize: 14, marginTop: 2 },
+  stage: { color: colors.gold, fontSize: 12, fontWeight: "700", marginTop: 3 },
+  stageNext: { color: colors.textDim, fontWeight: "500" },
   hidden: { color: colors.gold, fontSize: 12, marginTop: 4, fontWeight: "700" },
   pointsBadge: {
     backgroundColor: colors.accent,
