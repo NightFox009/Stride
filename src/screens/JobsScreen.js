@@ -4,18 +4,17 @@
 
 import React from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
-import { JOB_LEVEL, siblingJob } from "../../engine/jobs.js";
+import { JOB_LEVEL } from "../../engine/jobs.js";
 import { SKILLS } from "../../engine/skills.js";
 import { STAT_NAMES } from "../../engine/stats.js";
 import { useStride } from "../state/StrideContext.js";
-import { jobOptions, statsWithPassives } from "../game/profile.js";
+import { jobOptions, jobProgress } from "../game/profile.js";
 import Avatar from "../components/Avatar.js";
 import { colors, spacing } from "../theme.js";
 
 export default function JobsScreen({ onBack }) {
   const { profile, awaken } = useStride();
   const options = jobOptions(profile);
-  const stats = statsWithPassives(profile);
   const hasJob = !!profile.job;
 
   return (
@@ -32,13 +31,14 @@ export default function JobsScreen({ onBack }) {
       </Text>
 
       {options.map((job) => {
-        const levelOk = profile.level >= JOB_LEVEL;
-        const sib = siblingJob(job);
-        const reqs = [
-          { stat: job.signature.stat, need: job.signature.min },
-          { stat: job.branch, need: job.branchMin },
-        ];
-        const favorOk = !sib || (stats[job.branch] || 0) > (stats[sib.branch] || 0);
+        const pr = jobProgress(profile, job);
+        const sigName = STAT_NAMES[job.signature.stat];
+        const branchName = STAT_NAMES[job.branch];
+        const Row = ({ ok, children }) => (
+          <Text style={[styles.favor, ok ? styles.reqOk : styles.reqNo]}>
+            {ok ? "✓" : "✗"} {children}
+          </Text>
+        );
         return (
           <View key={job.id} style={[styles.card, job.active && styles.cardActive]}>
             <View style={styles.head}>
@@ -49,24 +49,15 @@ export default function JobsScreen({ onBack }) {
               </View>
             </View>
 
-            <Text style={styles.label}>Requires (level {JOB_LEVEL}+)</Text>
-            <View style={styles.reqs}>
-              {reqs.map(({ stat, need }) => {
-                const have = stats[stat] || 0;
-                const ok = have >= need;
-                return (
-                  <Text key={stat} style={[styles.req, ok ? styles.reqOk : styles.reqNo]}>
-                    {STAT_NAMES[stat]} {have}/{need} {ok ? "✓" : ""}
-                  </Text>
-                );
-              })}
-            </View>
-            {sib && (
-              <Text style={[styles.favor, favorOk ? styles.reqOk : styles.reqNo]}>
-                Lean into {STAT_NAMES[job.branch]} over {STAT_NAMES[sib.branch]}{" "}
-                ({stats[job.branch] || 0} vs {stats[sib.branch] || 0}) {favorOk ? "✓" : "✗"}
-              </Text>
-            )}
+            <Text style={styles.label}>Requirements</Text>
+            <Row ok={pr.levelOk}>Reach level {JOB_LEVEL}</Row>
+            <Row ok={pr.commitOk}>
+              Commit {pr.committed}/{pr.needCommit} pts into {sigName} + {branchName}
+            </Row>
+            <Row ok={pr.favorOk}>
+              Favor {branchName} over {pr.sib ? STAT_NAMES[pr.sib.branch] : "—"} ({pr.branchInv} vs {pr.sibBranchInv})
+            </Row>
+            <Row ok={pr.sigDominant}>{sigName} is your top stat ({pr.sigInv} ≥ {pr.branchInv})</Row>
 
             <Text style={styles.label}>Perk</Text>
             <Text style={styles.perk}>
@@ -94,7 +85,7 @@ export default function JobsScreen({ onBack }) {
                 style={[styles.awaken, !job.qualifies && styles.awakenOff]}
               >
                 <Text style={[styles.awakenText, !job.qualifies && styles.awakenTextOff]}>
-                  {!levelOk ? `Reach level ${JOB_LEVEL}` : job.qualifies ? "Awaken (permanent)" : "Requirements not met"}
+                  {!pr.levelOk ? `Reach level ${JOB_LEVEL}` : job.qualifies ? "Awaken (permanent)" : "Requirements not met"}
                 </Text>
               </Pressable>
             )}

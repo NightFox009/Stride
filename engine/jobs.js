@@ -63,19 +63,9 @@ export function getJob(id) {
 }
 
 // The other job of the same class (its branch is what you're compared against).
+// Qualification itself lives in profile.js (jobProgress), since it depends on
+// invested points and total earned points, not just current stat values.
 export function siblingJob(job) {
   if (!job) return null;
   return jobsFor(job.classId).find((j) => j.id !== job.id) || null;
-}
-
-// Does this stat block (level + stats) qualify for a job? Requires the signature
-// and branch minimums AND that the branch stat beats the sibling's branch stat,
-// so you can never qualify for both paths at once.
-export function meetsJobReq(job, level, stats) {
-  if (!job || level < JOB_LEVEL) return false;
-  if ((stats[job.signature.stat] || 0) < job.signature.min) return false;
-  if ((stats[job.branch] || 0) < job.branchMin) return false;
-  const sib = siblingJob(job);
-  if (sib && (stats[job.branch] || 0) <= (stats[sib.branch] || 0)) return false;
-  return true;
 }
