@@ -6,7 +6,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { STATS, STAT_NAMES } from "../../engine/stats.js";
 import { BASE_CLASSES } from "../../engine/classes.js";
 import { passiveMods } from "../../engine/passives.js";
-import { MAX_PER_STAT_PER_ALLOC } from "../game/profile.js";
+import { maxPerStat, investedPoints } from "../game/profile.js";
 import { useStride } from "../state/StrideContext.js";
 import RadarChart from "../components/RadarChart.js";
 import { colors, spacing, STAT_COLORS } from "../theme.js";
@@ -23,9 +23,14 @@ export default function StatsScreen({ onBack, onOpenSkills }) {
   const pointsLeft = profile.statPoints - draftTotal;
   const boost = BASE_CLASSES[profile.classId]?.boost;
 
+  // Focus cap: no stat may exceed 2/3 of all earned points.
+  const cap = maxPerStat(profile);
+  const invested = investedPoints(profile);
+  const atCap = (stat) => invested[stat] + draft[stat] >= cap;
+
   const inc = (stat) =>
     pointsLeft > 0 &&
-    draft[stat] < MAX_PER_STAT_PER_ALLOC &&
+    !atCap(stat) &&
     setDraft((d) => ({ ...d, [stat]: d[stat] + 1 }));
   const dec = (stat) => draft[stat] > 0 && setDraft((d) => ({ ...d, [stat]: d[stat] - 1 }));
   const reset = () => setDraft(emptyDraft());
@@ -54,7 +59,7 @@ export default function StatsScreen({ onBack, onOpenSkills }) {
         {pointsLeft} point{pointsLeft === 1 ? "" : "s"} to spend
       </Text>
       <Text style={styles.allocHint}>
-        Max {MAX_PER_STAT_PER_ALLOC} per stat each time you Confirm — spread your build.
+        A stat can hold at most 2 of every 3 points earned (cap {cap}) — spread your build.
       </Text>
 
       <View style={[styles.card, styles.radarCard]}>
@@ -76,6 +81,7 @@ export default function StatsScreen({ onBack, onOpenSkills }) {
                 {base + pending}
                 {bonus ? <Text style={styles.bonus}> (+{bonus})</Text> : null}
                 {pending ? <Text style={styles.pending}>  +{pending}</Text> : null}
+                {atCap(stat) ? <Text style={styles.capTag}>  max</Text> : null}
               </Text>
               <Pressable
                 disabled={pending <= 0}
@@ -85,12 +91,12 @@ export default function StatsScreen({ onBack, onOpenSkills }) {
                 <Text style={styles.stepText}>－</Text>
               </Pressable>
               <Pressable
-                disabled={pointsLeft <= 0 || pending >= MAX_PER_STAT_PER_ALLOC}
+                disabled={pointsLeft <= 0 || atCap(stat)}
                 onPress={() => inc(stat)}
                 style={[
                   styles.step,
                   styles.stepPlus,
-                  (pointsLeft <= 0 || pending >= MAX_PER_STAT_PER_ALLOC) && styles.stepOff,
+                  (pointsLeft <= 0 || atCap(stat)) && styles.stepOff,
                 ]}
               >
                 <Text style={styles.stepText}>＋</Text>
@@ -176,6 +182,7 @@ const styles = StyleSheet.create({
   },
   bonus: { color: colors.accent, fontSize: 12, fontWeight: "700" },
   pending: { color: colors.gold, fontSize: 13, fontWeight: "700" },
+  capTag: { color: colors.textDim, fontSize: 11, fontWeight: "700" },
   step: {
     width: 34, height: 34, borderRadius: 9, backgroundColor: colors.surfaceAlt,
     alignItems: "center", justifyContent: "center", marginLeft: spacing(0.75),

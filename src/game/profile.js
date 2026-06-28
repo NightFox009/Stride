@@ -18,7 +18,9 @@ export const SAVE_VERSION = 1;
 export const MAX_ENERGY = 200; // hard cap on stored Energy
 export const BASE_ENERGY = 100; // starting Energy for a new character
 export const ENERGY_REGEN_MS = 10 * 60 * 1000; // +1 Energy per 10 real minutes
-export const MAX_PER_STAT_PER_ALLOC = 2; // can't pour a whole level (3 pts) into one stat
+// At most 2 of every 3 earned stat points may sit on one stat (so a level's
+// 3 points can't all go to the same stat — even across multiple allocations).
+export const STAT_FOCUS_RATIO = 2 / 3;
 
 // Build a fresh profile for a newly chosen base class.
 export function createProfile(classId) {
@@ -176,13 +178,41 @@ export function msToNextEnergy(profile, now = Date.now()) {
   return Math.max(0, ENERGY_REGEN_MS - ((now - last) % ENERGY_REGEN_MS));
 }
 
+// Points invested into each stat from leveling (current value minus the class
+// starting block — the class's own +1 doesn't count toward the focus cap).
+export function investedPoints(profile) {
+  const base = startingStatsFor(profile.classId);
+  const out = {};
+  for (const s of Object.keys(profile.stats)) out[s] = profile.stats[s] - (base[s] || 0);
+  return out;
+}
+
+// Total stat points ever earned = already invested + still unspent. (Every
+// granted point is one or the other, so this needs no separate counter.)
+export function totalEarnedPoints(profile) {
+  const inv = investedPoints(profile);
+  const spent = Object.values(inv).reduce((a, b) => a + b, 0);
+  return spent + (profile.statPoints || 0);
+}
+
+// The most points any single stat may hold (≤ 2/3 of all earned points).
+export function maxPerStat(profile) {
+  return Math.floor(totalEarnedPoints(profile) * STAT_FOCUS_RATIO);
+}
+
 // Commit a batch of stat allocations at once (the Stats screen drafts these and
 // confirms). `alloc` is a map like { STR: 2, AGI: 1 }. Rejects overspends and
-// any single stat exceeding the per-allocation cap. Returns a new profile.
+// any stat that would exceed the focus cap (across all prior allocations too).
 export function applyAllocation(profile, alloc) {
   const spend = Object.values(alloc).reduce((s, n) => s + Math.max(0, n), 0);
   if (spend <= 0 || spend > profile.statPoints) return profile;
-  if (Object.values(alloc).some((n) => n > MAX_PER_STAT_PER_ALLOC)) return profile;
+
+  const cap = maxPerStat(profile);
+  const inv = investedPoints(profile);
+  for (const [stat, n] of Object.entries(alloc)) {
+    if (n > 0 && (inv[stat] || 0) + n > cap) return profile; // exceeds focus cap
+  }
+
   const stats = { ...profile.stats };
   for (const [stat, n] of Object.entries(alloc)) {
     if (n > 0 && stat in stats) stats[stat] += n;
