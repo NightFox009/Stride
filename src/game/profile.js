@@ -5,7 +5,7 @@
 
 import { BASE_CLASSES, startingStatsFor } from "../../engine/classes.js";
 import { derive } from "../../engine/stats.js";
-import { effectiveStats, treeFor, maxLevelFor } from "../../engine/classTree.js";
+import { effectiveStats, treeFor, maxLevelFor, rankLevelReq } from "../../engine/classTree.js";
 import { getJob, jobsFor, meetsJobReq } from "../../engine/jobs.js";
 import {
   gainExp as engineGainExp,
@@ -77,12 +77,21 @@ export function jobOptions(profile) {
   }));
 }
 
-// Awaken (or switch to) a job the character qualifies for.
+// Awaken a job the character qualifies for. This is a PERMANENT, one-time
+// choice — switching later will require a (future) Class Change item. Grants
+// the job's signature skill.
 export function awakenJob(profile, jobId) {
+  if (profile.job) return profile; // already chosen — locked
   const job = getJob(jobId);
   if (!job || job.classId !== profile.classId) return profile;
   if (!meetsJobReq(job, profile.level, statsWithPassives(profile))) return profile;
-  return { ...profile, job: jobId };
+
+  const next = { ...profile, job: jobId };
+  if (job.skill && !(profile.skills || []).includes(job.skill)) {
+    next.skills = [...(profile.skills || []), job.skill];
+    next.skillLevels = { ...(profile.skillLevels || {}), [job.skill]: 1 };
+  }
+  return next;
 }
 
 // Derived, never-persisted view used by the UI (HP/MP/attack/etc.). Uses the
@@ -258,7 +267,9 @@ export function learnSkill(profile, entryId) {
   const levels = profile.skillLevels || {};
   const current = levels[entry.id] || 0;
   if (current >= max) return profile;
-  if (profile.level < entry.level) return profile;
+  // The NEXT rank has its own character-level requirement (rank 1 = entry.level,
+  // each further rank needs more levels).
+  if (profile.level < rankLevelReq(entry, current + 1)) return profile;
   if ((profile.skillPoints || 0) < entry.cost) return profile;
 
   const next = { ...profile, skillPoints: profile.skillPoints - entry.cost };
@@ -273,4 +284,11 @@ export function learnSkill(profile, entryId) {
 // Helpers the UI uses to render the skill tree.
 export function skillLevelOf(profile, id) {
   return (profile.skillLevels || {})[id] || 0;
+}
+
+// Character level required to buy the next rank of a tree entry (null if maxed).
+export function nextRankLevelReq(profile, entry) {
+  const current = (profile.skillLevels || {})[entry.id] || 0;
+  if (current >= maxLevelFor(entry)) return null;
+  return rankLevelReq(entry, current + 1);
 }

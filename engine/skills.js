@@ -250,6 +250,53 @@ export const SKILLS = {
     },
   },
 
+  // ════════════════════════════════════════════════════════════
+  // Job signature skills — granted when a job awakens (see engine/jobs.js).
+  // Each scales off the class's signature stat.
+  // ════════════════════════════════════════════════════════════
+
+  // Knight
+  warlords_cleave: { id: "warlords_cleave", name: "Warlord's Cleave", cost: 15, target: "all", describe: "Sweeping STR damage to all foes.",
+    effect: (ctx) => ctx.targets.filter((t) => t.hp > 0).map((t) => ctx.dealDamage(ctx.user, t, ctx.user.stats.STR * 2.6, "physical")) },
+  crusaders_aegis: { id: "crusaders_aegis", name: "Crusader's Aegis", cost: 15, target: "single", describe: "STR strike, raise guard, and heal.",
+    effect: (ctx) => { ctx.user.guard = true; return [{ type: "buff", target: ctx.user.name, buff: "guard" }, ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.STR * 2.6, "physical"), ctx.heal(ctx.user, Math.round(ctx.user.stats.STR * 1.2))]; } },
+
+  // Sentinel
+  fortress_stance: { id: "fortress_stance", name: "Fortress Stance", cost: 15, target: "all", describe: "VIT damage to all and raise guard.",
+    effect: (ctx) => { ctx.user.guard = true; const e = [{ type: "buff", target: ctx.user.name, buff: "guard" }]; for (const t of ctx.targets.filter((x) => x.hp > 0)) e.push(ctx.dealDamage(ctx.user, t, ctx.user.stats.VIT * 2.0, "physical")); return e; } },
+  consecration: { id: "consecration", name: "Consecration", cost: 15, target: "all", describe: "Holy VIT damage to all and heal yourself.",
+    effect: (ctx) => { const e = ctx.targets.filter((t) => t.hp > 0).map((t) => ctx.dealDamage(ctx.user, t, ctx.user.stats.VIT * 1.7, "magic")); e.push(ctx.heal(ctx.user, Math.round(ctx.user.stats.VIT * 1.5))); return e; } },
+
+  // Monk
+  hundred_hands: { id: "hundred_hands", name: "Hundred Hands", cost: 15, target: "single", describe: "Four blistering END strikes.",
+    effect: (ctx) => { const t = ctx.targets[0]; const e = []; for (let i = 0; i < 4; i++) { if (t.hp <= 0) break; e.push(ctx.dealDamage(ctx.user, t, ctx.user.stats.END * 1.2, "physical")); } return e; } },
+  thunderclap: { id: "thunderclap", name: "Thunderclap", cost: 15, target: "all", describe: "END shockwave; may stun all.",
+    effect: (ctx) => ctx.targets.filter((t) => t.hp > 0).map((t) => { const d = ctx.dealDamage(ctx.user, t, ctx.user.stats.END * 1.8, "physical"); if (ctx.rng.chance(25)) t.stunned = true; return d; }) },
+
+  // Ranger
+  hunters_focus: { id: "hunters_focus", name: "Hunter's Focus", cost: 14, target: "single", describe: "A precise, near-certain AGI crit.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.AGI * 3.2, "physical", { critBonus: 20 })] },
+  kill_shot: { id: "kill_shot", name: "Kill Shot", cost: 16, target: "single", describe: "A devastating guaranteed-crit AGI shot.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.AGI * 3.0, "physical", { critBonus: 100 })] },
+
+  // Scholar
+  cataclysm: { id: "cataclysm", name: "Cataclysm", cost: 16, target: "all", describe: "Cataclysmic INT magic to all foes.",
+    effect: (ctx) => ctx.targets.filter((t) => t.hp > 0).map((t) => ctx.dealDamage(ctx.user, t, ctx.user.stats.INT * 2.6, "magic")) },
+  arcane_ward: { id: "arcane_ward", name: "Arcane Ward", cost: 15, target: "single", describe: "INT bolt, heal, and raise guard.",
+    effect: (ctx) => { ctx.user.guard = true; return [{ type: "buff", target: ctx.user.name, buff: "guard" }, ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.INT * 2.4, "magic"), ctx.heal(ctx.user, Math.round(ctx.user.stats.INT * 1.2))]; } },
+
+  // Herald
+  royal_command: { id: "royal_command", name: "Royal Command", cost: 15, target: "all", describe: "CHA damage to all and rally yourself.",
+    effect: (ctx) => { const e = ctx.targets.filter((t) => t.hp > 0).map((t) => ctx.dealDamage(ctx.user, t, ctx.user.stats.CHA * 1.8, "magic")); e.push(ctx.heal(ctx.user, Math.round(ctx.user.stats.CHA * 1.5))); return e; } },
+  rallying_charge: { id: "rallying_charge", name: "Rallying Charge", cost: 15, target: "all", describe: "A CHA-driven charge striking all foes.",
+    effect: (ctx) => ctx.targets.filter((t) => t.hp > 0).map((t) => ctx.dealDamage(ctx.user, t, ctx.user.stats.CHA * 2.0, "physical")) },
+
+  // Wanderer
+  jackpot_strike: { id: "jackpot_strike", name: "Jackpot Strike", cost: 15, target: "single", describe: "Spin fate — wildly variable LUK damage.",
+    effect: (ctx) => { const mult = 1.0 + ctx.rng.next() * (2.5 + ctx.user.stats.LUK * 0.07); return [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.LUK * 2.4 * mult, "magic")]; } },
+  shadowstrike: { id: "shadowstrike", name: "Shadowstrike", cost: 15, target: "single", describe: "A LUK strike from the shadows; high crit.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.LUK * 2.8, "physical", { critBonus: 35 })] },
+
   // ── Hidden: Juggernaut (1000 STR) ────────────────────────────
   earthshatter: {
     id: "earthshatter", name: "Earthshatter", cost: 12, target: "all",

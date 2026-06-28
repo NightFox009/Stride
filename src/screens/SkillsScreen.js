@@ -6,7 +6,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { treeFor, describeEntry } from "../../engine/classTree.js";
 import { SKILLS } from "../../engine/skills.js";
 import { useStride } from "../state/StrideContext.js";
-import { skillLevelOf } from "../game/profile.js";
+import { skillLevelOf, nextRankLevelReq } from "../game/profile.js";
 import { colors, spacing } from "../theme.js";
 
 export default function SkillsScreen({ onBack }) {
@@ -26,7 +26,7 @@ export default function SkillsScreen({ onBack }) {
       <Text style={styles.title}>Skills</Text>
       <Text style={styles.points}>{sp} skill point{sp === 1 ? "" : "s"}</Text>
 
-      <Text style={styles.sectionTitle}>Starter skills</Text>
+      <Text style={styles.sectionTitle}>Innate skills</Text>
       <View style={styles.card}>
         {starters.map((id) => (
           <View key={id} style={styles.starterRow}>
@@ -42,7 +42,8 @@ export default function SkillsScreen({ onBack }) {
         const lvl = skillLevelOf(profile, e.id);
         const known = lvl > 0;
         const atMax = lvl >= e.max;
-        const levelLocked = profile.level < e.level;
+        const nextReq = nextRankLevelReq(profile, e); // level needed for next rank
+        const levelLocked = nextReq != null && profile.level < nextReq;
         const tooPoor = sp < e.cost;
         const canBuy = !atMax && !levelLocked && !tooPoor;
         return (
@@ -66,7 +67,7 @@ export default function SkillsScreen({ onBack }) {
                   style={[styles.learnBtn, !canBuy && styles.learnOff]}
                 >
                   <Text style={[styles.learnText, !canBuy && styles.learnTextOff]}>
-                    {levelLocked ? `Lv ${e.level}` : `${known ? "Upgrade" : "Learn"} · ${e.cost} SP`}
+                    {levelLocked ? `Lv ${nextReq}` : `${known ? "Upgrade" : "Learn"} · ${e.cost} SP`}
                   </Text>
                 </Pressable>
               )}
@@ -75,8 +76,10 @@ export default function SkillsScreen({ onBack }) {
               {e.describe}
               {e.mpCost != null ? `  ·  ${e.mpCost} MP` : ""}
             </Text>
-            {levelLocked && !known && (
-              <Text style={styles.locked}>Unlocks at level {e.level}</Text>
+            {levelLocked && (
+              <Text style={styles.locked}>
+                {known ? `Next rank at level ${nextReq}` : `Unlocks at level ${nextReq}`}
+              </Text>
             )}
           </View>
         );

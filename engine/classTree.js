@@ -81,6 +81,14 @@ export function maxLevelFor(entry) {
   return entry.max ?? (entry.kind === "passive" ? 3 : 5);
 }
 
+// Each rank costs more character levels: rank 1 unlocks at entry.level, and
+// every further rank needs +RANK_LEVEL_STEP levels. So a Lv20 skill can't be
+// maxed until much later.
+export const RANK_LEVEL_STEP = 5;
+export function rankLevelReq(entry, rank) {
+  return entry.level + Math.max(0, rank - 1) * RANK_LEVEL_STEP;
+}
+
 // Look up display info (name/describe/cost/max) for a tree entry.
 export function describeEntry(entry) {
   const src = entry.kind === "passive" ? PASSIVES[entry.id] : SKILLS[entry.id];

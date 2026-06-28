@@ -5,6 +5,7 @@
 import React from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { JOB_LEVEL, siblingJob } from "../../engine/jobs.js";
+import { SKILLS } from "../../engine/skills.js";
 import { STAT_NAMES } from "../../engine/stats.js";
 import { useStride } from "../state/StrideContext.js";
 import { jobOptions, statsWithPassives } from "../game/profile.js";
@@ -15,6 +16,7 @@ export default function JobsScreen({ onBack }) {
   const { profile, awaken } = useStride();
   const options = jobOptions(profile);
   const stats = statsWithPassives(profile);
+  const hasJob = !!profile.job;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -25,7 +27,8 @@ export default function JobsScreen({ onBack }) {
       <Text style={styles.title}>Jobs</Text>
       <Text style={styles.sub}>
         Advanced paths awaken at level {JOB_LEVEL} when you meet their stat
-        requirements. Allocate toward the path you want.
+        requirements. Choosing a job is permanent — switching later needs a Class
+        Change item.
       </Text>
 
       {options.map((job) => {
@@ -70,9 +73,19 @@ export default function JobsScreen({ onBack }) {
               {Object.entries(job.mods).map(([s, v]) => `+${v} ${STAT_NAMES[s]}`).join("   ")}
             </Text>
 
+            <Text style={styles.label}>Signature skill</Text>
+            <Text style={styles.perk}>
+              {SKILLS[job.skill]?.name}
+              <Text style={styles.skillDesc}>  — {SKILLS[job.skill]?.describe}</Text>
+            </Text>
+
             {job.active ? (
               <View style={[styles.awaken, styles.awakenActive]}>
                 <Text style={styles.awakenActiveText}>★ Awakened</Text>
+              </View>
+            ) : hasJob ? (
+              <View style={[styles.awaken, styles.awakenOff]}>
+                <Text style={styles.awakenTextOff}>🔒 Needs a Class Change item</Text>
               </View>
             ) : (
               <Pressable
@@ -81,7 +94,7 @@ export default function JobsScreen({ onBack }) {
                 style={[styles.awaken, !job.qualifies && styles.awakenOff]}
               >
                 <Text style={[styles.awakenText, !job.qualifies && styles.awakenTextOff]}>
-                  {!levelOk ? `Reach level ${JOB_LEVEL}` : job.qualifies ? "Awaken" : "Requirements not met"}
+                  {!levelOk ? `Reach level ${JOB_LEVEL}` : job.qualifies ? "Awaken (permanent)" : "Requirements not met"}
                 </Text>
               </Pressable>
             )}
@@ -114,6 +127,7 @@ const styles = StyleSheet.create({
   reqNo: { color: colors.hp },
   favor: { fontSize: 13, fontWeight: "600", marginTop: spacing(0.75) },
   perk: { color: colors.text, fontSize: 14, fontWeight: "600", marginTop: spacing(0.5) },
+  skillDesc: { color: colors.textDim, fontSize: 12, fontWeight: "400" },
   awaken: {
     marginTop: spacing(2), backgroundColor: colors.accent, borderRadius: 12,
     paddingVertical: spacing(1.5), alignItems: "center",

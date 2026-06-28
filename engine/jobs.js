@@ -13,44 +13,45 @@ export const JOB_LEVEL = 20;
 const SIG_MIN = 24;
 const BRANCH_MIN = 18;
 
-function job(id, name, classId, signature, branch, color, emblem, blurb) {
+function job(id, name, classId, signature, branch, color, emblem, skill, blurb) {
   return {
     id, name, classId,
     signature: { stat: signature, min: SIG_MIN },
     branch, branchMin: BRANCH_MIN,
     mods: { [signature]: 6, [branch]: 4 },
+    skill, // signature active granted on awakening
     color, emblem, blurb,
   };
 }
 
 export const JOBS = {
   // Knight (STR) — END (relentless) vs VIT (armored)
-  warlord:       job("warlord", "Warlord", "knight", "STR", "END", "#ff6b5e", "blade", "A relentless, tireless offense."),
-  crusader:      job("crusader", "Crusader", "knight", "STR", "VIT", "#e8b04b", "tower", "An armored, immovable bruiser."),
+  warlord:       job("warlord", "Warlord", "knight", "STR", "END", "#ff6b5e", "blade", "warlords_cleave", "A relentless, tireless offense."),
+  crusader:      job("crusader", "Crusader", "knight", "STR", "VIT", "#e8b04b", "tower", "crusaders_aegis", "An armored, immovable bruiser."),
 
   // Sentinel (VIT) — END (endless) vs CHA (holy)
-  guardian:      job("guardian", "Guardian", "sentinel", "VIT", "END", "#3fb6a8", "tower", "An endlessly enduring wall."),
-  templar:       job("templar", "Templar", "sentinel", "VIT", "CHA", "#c792ea", "crown", "A holy defender who inspires."),
+  guardian:      job("guardian", "Guardian", "sentinel", "VIT", "END", "#3fb6a8", "tower", "fortress_stance", "An endlessly enduring wall."),
+  templar:       job("templar", "Templar", "sentinel", "VIT", "CHA", "#c792ea", "crown", "consecration", "A holy defender who inspires."),
 
   // Monk (END) — STR (power) vs AGI (speed)
-  grandmaster:   job("grandmaster", "Grandmaster", "monk", "END", "STR", "#e3a857", "fist", "A crushing martial master."),
-  stormfist:     job("stormfist", "Stormfist", "monk", "END", "AGI", "#5ad1a0", "wing", "A blur of lightning blows."),
+  grandmaster:   job("grandmaster", "Grandmaster", "monk", "END", "STR", "#e3a857", "fist", "hundred_hands", "A crushing martial master."),
+  stormfist:     job("stormfist", "Stormfist", "monk", "END", "AGI", "#5ad1a0", "wing", "thunderclap", "A blur of lightning blows."),
 
   // Ranger (AGI) — END (hunter) vs LUK (crit)
-  pathfinder:    job("pathfinder", "Pathfinder", "ranger", "AGI", "END", "#5ad1a0", "arrow", "A swift, untiring hunter."),
-  sniper:        job("sniper", "Sniper", "ranger", "AGI", "LUK", "#e3b341", "eye", "One shot, one lucky kill."),
+  pathfinder:    job("pathfinder", "Pathfinder", "ranger", "AGI", "END", "#5ad1a0", "arrow", "hunters_focus", "A swift, untiring hunter."),
+  sniper:        job("sniper", "Sniper", "ranger", "AGI", "LUK", "#e3b341", "eye", "kill_shot", "One shot, one lucky kill."),
 
   // Scholar (INT) — LUK (raw power) vs VIT (enduring)
-  archmage:      job("archmage", "Archmage", "scholar", "INT", "LUK", "#6ea8fe", "flame", "Raw, devastating arcana."),
-  sage:          job("sage", "Sage", "scholar", "INT", "VIT", "#56c2d6", "eye", "An enduring, wise mystic."),
+  archmage:      job("archmage", "Archmage", "scholar", "INT", "LUK", "#6ea8fe", "flame", "cataclysm", "Raw, devastating arcana."),
+  sage:          job("sage", "Sage", "scholar", "INT", "VIT", "#56c2d6", "eye", "arcane_ward", "An enduring, wise mystic."),
 
   // Herald (CHA) — LUK (regal) vs STR (war)
-  monarch:       job("monarch", "Monarch", "herald", "CHA", "LUK", "#c792ea", "crown", "A commanding, regal ruler."),
-  marshal:       job("marshal", "Marshal", "herald", "CHA", "STR", "#ff6b5e", "blade", "A frontline war-commander."),
+  monarch:       job("monarch", "Monarch", "herald", "CHA", "LUK", "#c792ea", "crown", "royal_command", "A commanding, regal ruler."),
+  marshal:       job("marshal", "Marshal", "herald", "CHA", "STR", "#ff6b5e", "blade", "rallying_charge", "A frontline war-commander."),
 
   // Wanderer (LUK) — CHA (charmed) vs AGI (nimble)
-  fortuneseeker: job("fortuneseeker", "Fortune-Seeker", "wanderer", "LUK", "CHA", "#e3b341", "coin", "Fate itself bends to you."),
-  rogue:         job("rogue", "Rogue", "wanderer", "LUK", "AGI", "#5ad1a0", "wing", "A cunning, elusive trickster."),
+  fortuneseeker: job("fortuneseeker", "Fortune-Seeker", "wanderer", "LUK", "CHA", "#e3b341", "coin", "jackpot_strike", "Fate itself bends to you."),
+  rogue:         job("rogue", "Rogue", "wanderer", "LUK", "AGI", "#5ad1a0", "wing", "shadowstrike", "A cunning, elusive trickster."),
 };
 
 export function jobsFor(classId) {
