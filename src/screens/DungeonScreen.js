@@ -60,6 +60,7 @@ export default function DungeonScreen({ onBack }) {
   const [, setTick] = useState(0);
   const [target, setTarget] = useState(0);
   const [levelsGained, setLevelsGained] = useState([]);
+  const [autoOn, setAutoOn] = useState(false);
   const rerender = () => setTick((t) => t + 1);
 
   const snap = sessionRef.current ? sessionRef.current.snapshot() : null;
@@ -71,6 +72,21 @@ export default function DungeonScreen({ onBack }) {
       setLevelsGained(commitFloorResult(snap.result));
     }
   });
+
+  // Auto-battle: while on and still fighting, take one turn every tick.
+  useEffect(() => {
+    if (!autoOn || !sessionRef.current) return;
+    if (snap?.phase !== "fighting") return;
+    const id = setInterval(() => {
+      const s = sessionRef.current;
+      if (!s) return;
+      const sn = s.snapshot();
+      if (sn.phase !== "fighting" || !sn.awaiting) return;
+      s.autoStep();
+      rerender();
+    }, 320);
+    return () => clearInterval(id);
+  }, [autoOn, snap?.phase]);
 
   const floor = profile.floor || 1;
   const type = floorType(floor);
@@ -196,11 +212,21 @@ export default function DungeonScreen({ onBack }) {
         <ProgressBar label="MP" value={player.mp} max={player.maxMP} color={colors.exp} />
       </View>
 
+      {/* Auto toggle */}
+      <Pressable
+        onPress={() => setAutoOn((v) => !v)}
+        style={[styles.auto, autoOn && styles.autoOn]}
+      >
+        <Text style={[styles.autoText, autoOn && styles.autoTextOn]}>
+          {autoOn ? "■ Auto-battling… (tap to take control)" : "▶ Auto-battle"}
+        </Text>
+      </Pressable>
+
       {/* Actions */}
       <View style={styles.actions}>
-        <ActionBtn label="Attack" onPress={() => { sessionRef.current.attack(liveTarget); rerender(); }} />
+        <ActionBtn label="Attack" disabled={autoOn} onPress={() => { sessionRef.current.attack(liveTarget); rerender(); }} />
         {menu.map((sk) => {
-          const disabled = player.mp < sk.cost;
+          const disabled = autoOn || player.mp < sk.cost;
           return (
             <ActionBtn
               key={sk.id}
@@ -211,7 +237,7 @@ export default function DungeonScreen({ onBack }) {
             />
           );
         })}
-        <ActionBtn label="Flee" tone="danger" onPress={() => { sessionRef.current.flee(); rerender(); }} />
+        <ActionBtn label="Flee" tone="danger" disabled={autoOn} onPress={() => { sessionRef.current.flee(); rerender(); }} />
       </View>
 
       <Log events={snap.log} tail={10} />
@@ -292,6 +318,13 @@ const styles = StyleSheet.create({
   enemyBarWrap: { flex: 1, height: 8, borderRadius: 4, backgroundColor: colors.surfaceAlt, overflow: "hidden", marginHorizontal: spacing(1) },
   enemyBar: { height: "100%", backgroundColor: colors.hp },
   enemyHp: { color: colors.textDim, fontSize: 12, width: 34, textAlign: "right", fontVariant: ["tabular-nums"] },
+  auto: {
+    backgroundColor: colors.surfaceAlt, borderRadius: 10, paddingVertical: spacing(1.25),
+    alignItems: "center", marginBottom: spacing(1), borderWidth: 1, borderColor: colors.border,
+  },
+  autoOn: { backgroundColor: colors.exp, borderColor: colors.exp },
+  autoText: { color: colors.exp, fontSize: 14, fontWeight: "800" },
+  autoTextOn: { color: colors.bg },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing(1), marginBottom: spacing(1.5) },
   action: {
     backgroundColor: colors.surfaceAlt, borderRadius: 10, paddingVertical: spacing(1.25),

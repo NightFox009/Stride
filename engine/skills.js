@@ -87,6 +87,122 @@ export const SKILLS = {
     },
   },
 
+  // ════════════════════════════════════════════════════════════
+  // Tier skills — learned with skill points at level thresholds.
+  // Each still scales off its class's signature stat (design principle).
+  // ════════════════════════════════════════════════════════════
+
+  // ── Knight (STR) ──
+  power_strike: {
+    id: "power_strike", name: "Power Strike", cost: 8, target: "single",
+    describe: "A devastating single STR blow.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.STR * 3.6, "physical")],
+  },
+  whirlwind: {
+    id: "whirlwind", name: "Whirlwind", cost: 12, target: "all",
+    describe: "Sweeping STR damage to every enemy.",
+    effect: (ctx) => ctx.targets.filter((t) => t.hp > 0).map((t) => ctx.dealDamage(ctx.user, t, ctx.user.stats.STR * 2.1, "physical")),
+  },
+
+  // ── Sentinel (VIT) ──
+  bulwark: {
+    id: "bulwark", name: "Bulwark", cost: 8, target: "single",
+    describe: "VIT strike, raise guard, and mend a little.",
+    effect: (ctx) => {
+      ctx.user.guard = true;
+      return [
+        { type: "buff", target: ctx.user.name, buff: "guard" },
+        ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.VIT * 2.0, "physical"),
+        ctx.heal(ctx.user, Math.round(ctx.user.stats.VIT)),
+      ];
+    },
+  },
+  retribution: {
+    id: "retribution", name: "Retribution", cost: 12, target: "single",
+    describe: "Heavy VIT damage that heals you for part of it.",
+    effect: (ctx) => {
+      const dmg = ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.VIT * 3.0, "physical");
+      return [dmg, ctx.heal(ctx.user, Math.round((dmg.amount || 0) * 0.4))];
+    },
+  },
+
+  // ── Monk (END) ──
+  iron_palm: {
+    id: "iron_palm", name: "Iron Palm", cost: 8, target: "single",
+    describe: "A focused END strike that often stuns.",
+    effect: (ctx) => {
+      const t = ctx.targets[0];
+      const events = [ctx.dealDamage(ctx.user, t, ctx.user.stats.END * 3.2, "physical")];
+      if (ctx.rng.chance(35)) { t.stunned = true; events.push({ type: "status", target: t.name, status: "stunned" }); }
+      return events;
+    },
+  },
+  thousand_fists: {
+    id: "thousand_fists", name: "Thousand Fists", cost: 12, target: "all",
+    describe: "A flurry of END blows to all enemies.",
+    effect: (ctx) => ctx.targets.filter((t) => t.hp > 0).map((t) => ctx.dealDamage(ctx.user, t, ctx.user.stats.END * 1.7, "physical")),
+  },
+
+  // ── Ranger (AGI) ──
+  double_tap: {
+    id: "double_tap", name: "Double Tap", cost: 8, target: "single",
+    describe: "Two AGI shots with high crit.",
+    effect: (ctx) => {
+      const t = ctx.targets[0];
+      const events = [];
+      for (let i = 0; i < 2; i++) {
+        if (t.hp <= 0) break;
+        events.push(ctx.dealDamage(ctx.user, t, ctx.user.stats.AGI * 1.9, "physical", { critBonus: 15 }));
+      }
+      return events;
+    },
+  },
+  arrow_storm: {
+    id: "arrow_storm", name: "Arrow Storm", cost: 12, target: "all",
+    describe: "A volley of AGI arrows hitting all foes.",
+    effect: (ctx) => ctx.targets.filter((t) => t.hp > 0).map((t) => ctx.dealDamage(ctx.user, t, ctx.user.stats.AGI * 1.9, "physical")),
+  },
+
+  // ── Scholar (INT) ──
+  frost_lance: {
+    id: "frost_lance", name: "Frost Lance", cost: 8, target: "single",
+    describe: "A piercing INT magic bolt.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.INT * 3.6, "magic")],
+  },
+  meteor: {
+    id: "meteor", name: "Meteor", cost: 14, target: "all",
+    describe: "Devastating INT magic to all enemies.",
+    effect: (ctx) => ctx.targets.filter((t) => t.hp > 0).map((t) => ctx.dealDamage(ctx.user, t, ctx.user.stats.INT * 2.3, "magic")),
+  },
+
+  // ── Herald (CHA) ──
+  inspire: {
+    id: "inspire", name: "Inspire", cost: 8, target: "self",
+    describe: "Rousing words restore a large amount of HP.",
+    effect: (ctx) => [ctx.heal(ctx.user, Math.round(ctx.user.stats.CHA * 3 + ctx.user.stats.VIT))],
+  },
+  anthem: {
+    id: "anthem", name: "Battle Anthem", cost: 12, target: "all",
+    describe: "A soaring CHA anthem that wounds all foes.",
+    effect: (ctx) => ctx.targets.filter((t) => t.hp > 0).map((t) => ctx.dealDamage(ctx.user, t, ctx.user.stats.CHA * 1.9, "magic")),
+  },
+
+  // ── Wanderer (LUK) ──
+  lucky_strike: {
+    id: "lucky_strike", name: "Lucky Strike", cost: 8, target: "single",
+    describe: "A LUK strike that almost always crits.",
+    effect: (ctx) => [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.LUK * 2.8, "physical", { critBonus: 30 })],
+  },
+  fortunes_wheel: {
+    id: "fortunes_wheel", name: "Fortune's Wheel", cost: 12, target: "single",
+    describe: "Spin fate — LUK damage that can be enormous.",
+    effect: (ctx) => {
+      const roll = ctx.rng.next();
+      const mult = 0.7 + roll * (2.2 + ctx.user.stats.LUK * 0.06);
+      return [ctx.dealDamage(ctx.user, ctx.targets[0], ctx.user.stats.LUK * 2.4 * mult, "magic")];
+    },
+  },
+
   // ── Hidden: Juggernaut (1000 STR) ────────────────────────────
   earthshatter: {
     id: "earthshatter", name: "Earthshatter", cost: 12, target: "all",

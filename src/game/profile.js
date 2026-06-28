@@ -5,6 +5,7 @@
 
 import { BASE_CLASSES, startingStatsFor } from "../../engine/classes.js";
 import { derive } from "../../engine/stats.js";
+import { effectiveStats, treeFor } from "../../engine/classTree.js";
 import {
   gainExp as engineGainExp,
   stepsToXP,
@@ -27,8 +28,10 @@ export function createProfile(classId) {
     level: 1,
     exp: 0,
     statPoints: 0,
+    skillPoints: 0,
     stats: startingStatsFor(classId),
     skills: [...cls.skills],
+    passives: [],
     energy: 0,
     gold: 0,
     // Deepest floor not yet cleared — the dungeon's "current floor".
@@ -42,9 +45,15 @@ export function createProfile(classId) {
   };
 }
 
-// Derived, never-persisted view used by the UI (HP/MP/attack/etc.).
+// The stat block actually used in combat: base allocation + passive bonuses.
+export function statsWithPassives(profile) {
+  return effectiveStats(profile.stats, profile.passives || []);
+}
+
+// Derived, never-persisted view used by the UI (HP/MP/attack/etc.). Uses the
+// effective stats so passives are reflected in the combat sheet.
 export function deriveSheet(profile) {
-  const s = profile.stats;
+  const s = statsWithPassives(profile);
   return {
     maxHP: derive.maxHP(s) + levelHpBonus(profile.level),
     maxMP: derive.maxMP(s),
@@ -85,6 +94,7 @@ export function applySteps(profile, newSteps) {
     const res = engineGainExp(p, xpGain);
     p = res.profile;
     levelsGained = res.levelsGained;
+    p.skillPoints = (p.skillPoints || 0) + levelsGained.length; // 1 skill point / level
   }
 
   return {
@@ -107,6 +117,7 @@ export function applyFloorResult(profile, result) {
     const res = engineGainExp(p, result.xp);
     p = res.profile;
     levelsGained = res.levelsGained;
+    p.skillPoints = (p.skillPoints || 0) + levelsGained.length; // 1 skill point / level
   }
 
   // Only a full clear pushes you deeper; defeat/flee keep you on this floor.
@@ -115,14 +126,37 @@ export function applyFloorResult(profile, result) {
   return { profile: p, levelsGained };
 }
 
-// Spend one stat point to raise a stat by 1. Returns a new profile (or the same
-// one if there are no points to spend).
-export function allocateStat(profile, stat) {
-  if (profile.statPoints <= 0) return profile;
-  if (!(stat in profile.stats)) return profile;
-  return {
-    ...profile,
-    statPoints: profile.statPoints - 1,
-    stats: { ...profile.stats, [stat]: profile.stats[stat] + 1 },
-  };
+// Commit a batch of stat allocations at once (the Stats screen drafts these and
+// confirms). `alloc` is a map like { STR: 2, AGI: 1 }. Ignores the change if it
+// would overspend. Returns a new profile.
+export function applyAllocation(profile, alloc) {
+  const spend = Object.values(alloc).reduce((s, n) => s + Math.max(0, n), 0);
+  if (spend <= 0 || spend > profile.statPoints) return profile;
+  const stats = { ...profile.stats };
+  for (const [stat, n] of Object.entries(alloc)) {
+    if (n > 0 && stat in stats) stats[stat] += n;
+  }
+  return { ...profile, statPoints: profile.statPoints - spend, stats };
+}
+
+// Learn a class-tree skill/passive with skill points. Validates level + cost +
+// not-already-known. Returns a new profile (or the same if not learnable).
+export function learnSkill(profile, entryId) {
+  const entry = treeFor(profile.classId).find((e) => e.id === entryId);
+  if (!entry) return profile;
+  const known = entry.kind === "passive" ? profile.passives || [] : profile.skills || [];
+  if (known.includes(entry.id)) return profile;
+  if (profile.level < entry.level) return profile;
+  if ((profile.skillPoints || 0) < entry.cost) return profile;
+
+  const next = { ...profile, skillPoints: profile.skillPoints - entry.cost };
+  if (entry.kind === "passive") next.passives = [...(profile.passives || []), entry.id];
+  else next.skills = [...(profile.skills || []), entry.id];
+  return next;
+}
+
+// Helpers the UI uses to render the skill tree.
+export function knownEntry(profile, entry) {
+  const known = entry.kind === "passive" ? profile.passives || [] : profile.skills || [];
+  return known.includes(entry.id);
 }

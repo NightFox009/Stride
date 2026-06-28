@@ -1,24 +1,40 @@
-// Stats screen: spend stat points and read the derived combat sheet. Hidden
-// classes unlock at 1000 in a stat, so we show progress toward the next one.
+// Stats: draft your point allocation (with +/-), preview it on the radar, then
+// Confirm to commit. Shows passive bonuses and links to the Skills tree.
 
 import React, { useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { STATS, STAT_NAMES } from "../../engine/stats.js";
 import { BASE_CLASSES } from "../../engine/classes.js";
+import { passiveMods } from "../../engine/passives.js";
 import { useStride } from "../state/StrideContext.js";
 import RadarChart from "../components/RadarChart.js";
 import { colors, spacing, STAT_COLORS } from "../theme.js";
 
-export default function StatsScreen({ onBack }) {
-  const { profile, sheet, spendStatPoint, resetGame } = useStride();
-  const canSpend = profile.statPoints > 0;
+const emptyDraft = () => STATS.reduce((o, s) => ((o[s] = 0), o), {});
+
+export default function StatsScreen({ onBack, onOpenSkills }) {
+  const { profile, sheet, allocateStats, resetGame } = useStride();
+  const [draft, setDraft] = useState(emptyDraft);
   const [confirmReset, setConfirmReset] = useState(false);
 
+  const mods = passiveMods(profile.passives || []);
+  const draftTotal = Object.values(draft).reduce((s, n) => s + n, 0);
+  const pointsLeft = profile.statPoints - draftTotal;
   const boost = BASE_CLASSES[profile.classId]?.boost;
+
+  const inc = (stat) => pointsLeft > 0 && setDraft((d) => ({ ...d, [stat]: d[stat] + 1 }));
+  const dec = (stat) => draft[stat] > 0 && setDraft((d) => ({ ...d, [stat]: d[stat] - 1 }));
+  const reset = () => setDraft(emptyDraft());
+  const confirm = () => {
+    allocateStats(draft);
+    setDraft(emptyDraft());
+  };
+
+  // Radar previews base + pending draft so you see the shape before committing.
   const radarData = STATS.map((stat) => ({
     key: stat,
     label: STAT_NAMES[stat],
-    value: profile.stats[stat],
+    value: profile.stats[stat] + draft[stat],
     color: STAT_COLORS[stat],
     emphasized: stat === boost,
   }));
@@ -31,7 +47,7 @@ export default function StatsScreen({ onBack }) {
 
       <Text style={styles.title}>Stats</Text>
       <Text style={styles.points}>
-        {profile.statPoints} unspent point{profile.statPoints === 1 ? "" : "s"}
+        {pointsLeft} point{pointsLeft === 1 ? "" : "s"} to spend
       </Text>
 
       <View style={[styles.card, styles.radarCard]}>
@@ -39,27 +55,56 @@ export default function StatsScreen({ onBack }) {
       </View>
 
       <View style={styles.card}>
-        {STATS.map((stat) => (
-          <View key={stat} style={styles.statRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.statName}>{STAT_NAMES[stat]}</Text>
-              <Text style={styles.statAbbr}>{stat}</Text>
+        {STATS.map((stat) => {
+          const base = profile.stats[stat];
+          const pending = draft[stat];
+          const bonus = mods[stat] || 0;
+          return (
+            <View key={stat} style={styles.statRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.statName}>{STAT_NAMES[stat]}</Text>
+                <Text style={styles.statAbbr}>{stat}</Text>
+              </View>
+              <Text style={styles.statValue}>
+                {base + pending}
+                {bonus ? <Text style={styles.bonus}> (+{bonus})</Text> : null}
+                {pending ? <Text style={styles.pending}>  +{pending}</Text> : null}
+              </Text>
+              <Pressable
+                disabled={pending <= 0}
+                onPress={() => dec(stat)}
+                style={[styles.step, pending <= 0 && styles.stepOff]}
+              >
+                <Text style={styles.stepText}>－</Text>
+              </Pressable>
+              <Pressable
+                disabled={pointsLeft <= 0}
+                onPress={() => inc(stat)}
+                style={[styles.step, styles.stepPlus, pointsLeft <= 0 && styles.stepOff]}
+              >
+                <Text style={styles.stepText}>＋</Text>
+              </Pressable>
             </View>
-            <Text style={styles.statValue}>{profile.stats[stat]}</Text>
-            <Pressable
-              disabled={!canSpend}
-              onPress={() => spendStatPoint(stat)}
-              style={({ pressed }) => [
-                styles.plus,
-                !canSpend && styles.plusDisabled,
-                pressed && canSpend && styles.plusPressed,
-              ]}
-            >
-              <Text style={styles.plusText}>＋</Text>
+          );
+        })}
+
+        {draftTotal > 0 && (
+          <View style={styles.confirmRow}>
+            <Pressable onPress={reset} style={styles.cancelBtn}>
+              <Text style={styles.cancelBtnText}>Reset</Text>
+            </Pressable>
+            <Pressable onPress={confirm} style={styles.confirmBtn}>
+              <Text style={styles.confirmBtnText}>Confirm +{draftTotal}</Text>
             </Pressable>
           </View>
-        ))}
+        )}
       </View>
+
+      <Pressable onPress={onOpenSkills} style={styles.skillsLink}>
+        <Text style={styles.skillsLinkText}>
+          Skills & passives{profile.skillPoints ? `  ·  ${profile.skillPoints} SP` : ""} →
+        </Text>
+      </Pressable>
 
       <Text style={styles.sectionTitle}>Combat sheet</Text>
       <View style={styles.card}>
@@ -74,7 +119,7 @@ export default function StatsScreen({ onBack }) {
 
       <Pressable
         onPress={() => (confirmReset ? resetGame() : setConfirmReset(true))}
-        style={[styles.reset, confirmReset && styles.resetArmed]}
+        style={[styles.resetChar, confirmReset && styles.resetArmed]}
       >
         <Text style={[styles.resetText, confirmReset && styles.resetTextArmed]}>
           {confirmReset ? "Tap again to erase & start over" : "Reset character"}
@@ -106,51 +151,43 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 28, fontWeight: "800" },
   points: { color: colors.accent, fontSize: 14, fontWeight: "700", marginBottom: spacing(2) },
   card: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: spacing(2),
-    marginBottom: spacing(2),
+    backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1,
+    borderRadius: 14, padding: spacing(2), marginBottom: spacing(2),
   },
   radarCard: { alignItems: "center", paddingVertical: spacing(2.5) },
   statRow: { flexDirection: "row", alignItems: "center", paddingVertical: spacing(1) },
   statName: { color: colors.text, fontSize: 16, fontWeight: "600" },
   statAbbr: { color: colors.textDim, fontSize: 11 },
   statValue: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: "800",
-    fontVariant: ["tabular-nums"],
-    marginRight: spacing(2),
-    minWidth: 36,
-    textAlign: "right",
+    color: colors.text, fontSize: 17, fontWeight: "800", fontVariant: ["tabular-nums"],
+    marginRight: spacing(1.5), minWidth: 78, textAlign: "right",
   },
-  plus: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
+  bonus: { color: colors.accent, fontSize: 12, fontWeight: "700" },
+  pending: { color: colors.gold, fontSize: 13, fontWeight: "700" },
+  step: {
+    width: 34, height: 34, borderRadius: 9, backgroundColor: colors.surfaceAlt,
+    alignItems: "center", justifyContent: "center", marginLeft: spacing(0.75),
   },
-  plusDisabled: { backgroundColor: colors.surfaceAlt },
-  plusPressed: { opacity: 0.7 },
-  plusText: { color: colors.bg, fontSize: 20, fontWeight: "800", lineHeight: 22 },
+  stepPlus: { backgroundColor: colors.accent },
+  stepOff: { opacity: 0.35 },
+  stepText: { color: colors.bg, fontSize: 18, fontWeight: "800" },
+  confirmRow: { flexDirection: "row", gap: spacing(1), marginTop: spacing(1.5) },
+  cancelBtn: { flex: 1, alignItems: "center", paddingVertical: spacing(1.25), borderRadius: 10, backgroundColor: colors.surfaceAlt },
+  cancelBtnText: { color: colors.textDim, fontWeight: "700" },
+  confirmBtn: { flex: 2, alignItems: "center", paddingVertical: spacing(1.25), borderRadius: 10, backgroundColor: colors.accent },
+  confirmBtnText: { color: colors.bg, fontWeight: "800" },
+  skillsLink: {
+    backgroundColor: colors.surface, borderColor: colors.exp, borderWidth: 1,
+    borderRadius: 12, padding: spacing(1.75), alignItems: "center", marginBottom: spacing(2),
+  },
+  skillsLinkText: { color: colors.exp, fontSize: 15, fontWeight: "800" },
   sectionTitle: { color: colors.text, fontSize: 16, fontWeight: "700", marginBottom: spacing(1) },
-  derivedRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: spacing(0.75),
-  },
+  derivedRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: spacing(0.75) },
   derivedKey: { color: colors.textDim, fontSize: 14 },
   derivedVal: { color: colors.text, fontSize: 14, fontWeight: "700" },
-  reset: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingVertical: spacing(1.5),
-    alignItems: "center",
+  resetChar: {
+    borderWidth: 1, borderColor: colors.border, borderRadius: 12,
+    paddingVertical: spacing(1.5), alignItems: "center",
   },
   resetArmed: { borderColor: colors.danger, backgroundColor: colors.surface },
   resetText: { color: colors.textDim, fontSize: 14, fontWeight: "700" },

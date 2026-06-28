@@ -12,6 +12,7 @@ import { StrideProvider, useStride } from "./src/state/StrideContext.js";
 import ClassSelectScreen from "./src/screens/ClassSelectScreen.js";
 import HomeScreen from "./src/screens/HomeScreen.js";
 import StatsScreen from "./src/screens/StatsScreen.js";
+import SkillsScreen from "./src/screens/SkillsScreen.js";
 import DungeonScreen from "./src/screens/DungeonScreen.js";
 import { colors } from "./src/theme.js";
 
@@ -30,7 +31,9 @@ function Root() {
 
   if (!profile) return <ClassSelectScreen />;
 
-  if (screen === "stats") return <StatsScreen onBack={() => setScreen("home")} />;
+  if (screen === "stats")
+    return <StatsScreen onBack={() => setScreen("home")} onOpenSkills={() => setScreen("skills")} />;
+  if (screen === "skills") return <SkillsScreen onBack={() => setScreen("stats")} />;
   if (screen === "dungeon") return <DungeonScreen onBack={() => setScreen("home")} />;
   return (
     <HomeScreen

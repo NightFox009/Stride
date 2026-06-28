@@ -108,6 +108,27 @@ export function createFloorSession({ floor, stats, skills, level = 1, rng = crea
     if (!step.awaiting) resolveBattle();
   }
 
+  // Take one turn automatically with the same policy the balance harness uses:
+  // heal when low, else cast the first affordable damage skill, else attack.
+  function autoStep() {
+    if (phase !== "fighting" || !battle) return;
+    const enemies = battle.enemies;
+    const target = enemies.findIndex((e) => e.hp > 0);
+    for (const id of skills) {
+      const s = SKILLS[id];
+      if (s && s.target === "self" && player.hp < player.maxHP * 0.4 && player.mp >= s.cost) {
+        return act({ kind: "skill", skillId: id, targetIndex: target });
+      }
+    }
+    for (const id of skills) {
+      const s = SKILLS[id];
+      if (s && s.target !== "self" && player.mp >= s.cost) {
+        return act({ kind: "skill", skillId: id, targetIndex: target });
+      }
+    }
+    return act({ kind: "attack", targetIndex: target });
+  }
+
   const skillMenu = skills
     .map((id) => {
       const s = SKILLS[id];
@@ -136,6 +157,7 @@ export function createFloorSession({ floor, stats, skills, level = 1, rng = crea
     floorType: type,
     skillMenu,
     act,
+    autoStep,
     attack: (targetIndex = 0) => act({ kind: "attack", targetIndex }),
     skill: (skillId, targetIndex = 0) => act({ kind: "skill", skillId, targetIndex }),
     flee: () => act({ kind: "flee" }),

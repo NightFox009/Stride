@@ -13,9 +13,11 @@ import { loadProfile, saveProfile, clearProfile } from "../game/persistence.js";
 import {
   createProfile,
   applySteps,
-  allocateStat,
+  applyAllocation,
+  learnSkill,
   applyFloorResult,
   deriveSheet,
+  statsWithPassives,
 } from "../game/profile.js";
 import { createFloorSession } from "../../engine/dungeonSession.js";
 import { energyCost } from "../../engine/floors.js";
@@ -74,8 +76,12 @@ export function StrideProvider({ children }) {
     if (earned.xp > 0 || earned.energy > 0) setLastEarned(earned);
   }, []);
 
-  const spendStatPoint = useCallback((stat) => {
-    setProfile((p) => (p ? allocateStat(p, stat) : p));
+  const allocateStats = useCallback((alloc) => {
+    setProfile((p) => (p ? applyAllocation(p, alloc) : p));
+  }, []);
+
+  const learn = useCallback((entryId) => {
+    setProfile((p) => (p ? learnSkill(p, entryId) : p));
   }, []);
 
   // Start an interactive dungeon floor. Returns a session controller (see
@@ -88,7 +94,7 @@ export function StrideProvider({ children }) {
     if (p.energy < energyCost(floor)) return null;
     return createFloorSession({
       floor,
-      stats: p.stats,
+      stats: statsWithPassives(p), // base allocation + passive bonuses
       skills: p.skills,
       level: p.level,
       rng: createRng(),
@@ -113,7 +119,8 @@ export function StrideProvider({ children }) {
     startGame,
     resetGame,
     ingestSteps,
-    spendStatPoint,
+    allocateStats,
+    learn,
     beginFloorSession,
     commitFloorResult,
     floorCost: profile ? energyCost(profile.floor || 1) : 0,
