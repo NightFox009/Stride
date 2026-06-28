@@ -15,7 +15,7 @@ function polar(cx, cy, r, angleDeg) {
 }
 
 // data: [{ key, label, value, emphasized, color }]
-export default function RadarChart({ data, size = 280 }) {
+export default function RadarChart({ data, size = 280, showValues = false }) {
   const cx = size / 2;
   const cy = size / 2;
   const R = size / 2 - 48; // leave room for axis labels
@@ -77,7 +77,7 @@ export default function RadarChart({ data, size = 280 }) {
           />
           <SvgText
             x={v.labelPt.x}
-            y={v.labelPt.y + 4}
+            y={v.labelPt.y + (showValues ? -1 : 4)}
             fill={v.emphasized ? v.color || colors.text : colors.textDim}
             fontSize={11}
             fontWeight={v.emphasized ? "700" : "500"}
@@ -85,6 +85,18 @@ export default function RadarChart({ data, size = 280 }) {
           >
             {v.label}
           </SvgText>
+          {showValues && (
+            <SvgText
+              x={v.labelPt.x}
+              y={v.labelPt.y + 12}
+              fill={v.emphasized ? v.color || colors.text : colors.text}
+              fontSize={12}
+              fontWeight="800"
+              textAnchor={v.anchor}
+            >
+              {v.value}
+            </SvgText>
+          )}
         </G>
       ))}
     </Svg>

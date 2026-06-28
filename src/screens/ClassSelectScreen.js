@@ -46,7 +46,7 @@ export default function ClassSelectScreen() {
 
       {/* Affinity preview */}
       <View style={styles.preview}>
-        <RadarChart data={radarData} size={280} />
+        <RadarChart data={radarData} size={280} showValues />
         <Text style={styles.previewName}>{selected.name}</Text>
         <Text style={styles.previewTag}>{TAGLINES[selectedId]}</Text>
       </View>

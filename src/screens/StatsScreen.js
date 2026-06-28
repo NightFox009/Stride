@@ -4,13 +4,24 @@
 import React, { useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { STATS, STAT_NAMES } from "../../engine/stats.js";
+import { BASE_CLASSES } from "../../engine/classes.js";
 import { useStride } from "../state/StrideContext.js";
-import { colors, spacing } from "../theme.js";
+import RadarChart from "../components/RadarChart.js";
+import { colors, spacing, STAT_COLORS } from "../theme.js";
 
 export default function StatsScreen({ onBack }) {
   const { profile, sheet, spendStatPoint, resetGame } = useStride();
   const canSpend = profile.statPoints > 0;
   const [confirmReset, setConfirmReset] = useState(false);
+
+  const boost = BASE_CLASSES[profile.classId]?.boost;
+  const radarData = STATS.map((stat) => ({
+    key: stat,
+    label: STAT_NAMES[stat],
+    value: profile.stats[stat],
+    color: STAT_COLORS[stat],
+    emphasized: stat === boost,
+  }));
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -22,6 +33,10 @@ export default function StatsScreen({ onBack }) {
       <Text style={styles.points}>
         {profile.statPoints} unspent point{profile.statPoints === 1 ? "" : "s"}
       </Text>
+
+      <View style={[styles.card, styles.radarCard]}>
+        <RadarChart data={radarData} size={280} showValues />
+      </View>
 
       <View style={styles.card}>
         {STATS.map((stat) => (
@@ -98,6 +113,7 @@ const styles = StyleSheet.create({
     padding: spacing(2),
     marginBottom: spacing(2),
   },
+  radarCard: { alignItems: "center", paddingVertical: spacing(2.5) },
   statRow: { flexDirection: "row", alignItems: "center", paddingVertical: spacing(1) },
   statName: { color: colors.text, fontSize: 16, fontWeight: "600" },
   statAbbr: { color: colors.textDim, fontSize: 11 },
