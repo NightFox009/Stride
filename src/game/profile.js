@@ -7,7 +7,7 @@ import { BASE_CLASSES, startingStatsFor } from "../../engine/classes.js";
 import { derive } from "../../engine/stats.js";
 import { effectiveStats, treeFor, maxLevelFor, rankLevelReq } from "../../engine/classTree.js";
 import { getJob, jobsFor, JOB_LEVEL, classWeaponTypes } from "../../engine/jobs.js";
-import { equipmentMods, SLOTS } from "../../engine/items.js";
+import { equipmentMods, SLOTS, CLASS_GEAR } from "../../engine/items.js";
 import {
   upgradeCost,
   rarityUpgradeCost,
@@ -300,16 +300,20 @@ export function allowedWeaponTypes(profile) {
   return classWeaponTypes(profile.classId);
 }
 
-// Can this character equip the given item? Gear is class-specific; weapons are
-// further limited to the character's allowed weapon types.
+// Can this character equip the given item? Armor and accessories are universal
+// (any class may wear them, even off-class). Weapons are limited to the
+// character's allowed weapon types; sub-weapons to the class's own type.
 export function canEquipItem(profile, item) {
   if (!item) return false;
-  if (item.forClass && item.forClass !== profile.classId) return false; // another class's gear
   if (item.slot === "weapon") {
     const wt = item.weaponType || item.base;
-    if (wt && !allowedWeaponTypes(profile).includes(wt)) return false;
+    return !wt || allowedWeaponTypes(profile).includes(wt);
   }
-  return true;
+  if (item.slot === "subweapon") {
+    const sub = (CLASS_GEAR[profile.classId] || {}).sub;
+    return !item.subType || item.subType === sub;
+  }
+  return true; // helm / armor / gloves / boots / accessory — any class
 }
 
 // Equip an item from the inventory; any item already in that slot returns to

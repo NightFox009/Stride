@@ -4,6 +4,7 @@
 // bonuses; depth + Luck ("magic find") tilt the odds.
 
 import { STATS } from "./stats.js";
+import { classWeaponTypes } from "./jobs.js";
 
 // Equip slots, grouped into UI categories.
 export const SLOTS = ["weapon", "subweapon", "helm", "armor", "gloves", "boots", "accessory"];
@@ -40,14 +41,19 @@ export const CLASS_GEAR = {
 };
 
 // SPD is a gear-only stat (not one of the 7 allocatable stats): it adds to
-// combat initiative so you act first. Flavoured per class as Attack/Cast Speed.
+// combat initiative so you act first.
 export const SPD_STAT = "SPD";
-export function spdLabel(classId) {
-  return classId === "scholar" ? "Cast Speed" : "Attack Speed";
+export function statLabel(stat) {
+  return stat === SPD_STAT ? "Speed" : stat;
 }
-// Pretty label for a stat on an item (SPD shows its class flavour).
-export function statLabel(stat, forClass) {
-  return stat === SPD_STAT ? spdLabel(forClass) : stat;
+
+const CLASSES = Object.keys(CLASS_GEAR);
+// Pick the class an item is themed for: usually the player's (so suitable gear
+// is more common), sometimes another's (off-class loot you can use or trade).
+function rollItemClass(rng, playerClass) {
+  if (playerClass && rng.next() < 0.72) return playerClass;
+  const others = CLASSES.filter((c) => c !== playerClass);
+  return others.length ? rng.pick(others) : playerClass || rng.pick(CLASSES);
 }
 
 // Per-class main stat for each slot. Gloves grant SPD (Attack/Cast Speed) so
@@ -92,15 +98,17 @@ function uid() {
   return `it_${Date.now().toString(36)}_${counter}_${Math.floor(Math.random() * 1e6).toString(36)}`;
 }
 
-// Generate one class-themed item for a floor. opts: { classId, weaponTypes,
-// bonusFind }. weaponTypes restricts weapon drops to usable types.
+// Generate one item for a floor. opts: { playerClass, playerWeaponTypes,
+// bonusFind }. The item is themed to a class — usually the player's, sometimes
+// another's. A player-class weapon is biased to the player's usable types.
 export function generateItem(floor, luck, rng, opts = {}) {
-  const { classId = "knight", weaponTypes = null, bonusFind = 0 } = opts;
+  const { playerClass = "knight", playerWeaponTypes = null, bonusFind = 0 } = opts;
+  const itemClass = rollItemClass(rng, playerClass);
   const rarityId = rollRarity(rng, floor, luck, bonusFind);
   const rarity = RARITIES[rarityId];
   const slot = rng.pick(SLOTS);
-  const gear = CLASS_GEAR[classId] || CLASS_GEAR.knight;
-  const focus = (CLASS_FOCUS[classId] || CLASS_FOCUS.knight)[slot];
+  const gear = CLASS_GEAR[itemClass] || CLASS_GEAR.knight;
+  const focus = (CLASS_FOCUS[itemClass] || CLASS_FOCUS.knight)[slot];
 
   const base = 2 + Math.floor(floor * 0.4);
   const mods = {};
@@ -116,8 +124,11 @@ export function generateItem(floor, luck, rng, opts = {}) {
 
   let noun, weaponType, subType;
   if (slot === "weapon") {
-    const wpool = weaponTypes && weaponTypes.length ? weaponTypes : WEAPON_TYPES;
-    weaponType = rng.pick(wpool);
+    const wpool =
+      itemClass === playerClass && playerWeaponTypes && playerWeaponTypes.length
+        ? playerWeaponTypes
+        : classWeaponTypes(itemClass);
+    weaponType = rng.pick(wpool && wpool.length ? wpool : WEAPON_TYPES);
     noun = weaponType;
   } else if (slot === "subweapon") {
     subType = gear.sub;
@@ -132,7 +143,7 @@ export function generateItem(floor, luck, rng, opts = {}) {
     id: uid(),
     slot,
     rarity: rarityId,
-    forClass: classId,
+    forClass: itemClass,
     base: noun, // noun kept so rarity crafting can rename cleanly
     name: `${rarity.name} ${gear.set} ${noun}`,
     level: floor,

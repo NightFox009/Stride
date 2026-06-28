@@ -23,7 +23,7 @@ const SLOT_LABEL = {
 };
 
 function modText(item) {
-  return Object.entries(itemMods(item)).map(([s, v]) => `+${v} ${statLabel(s, item.forClass)}`).join("  ");
+  return Object.entries(itemMods(item)).map(([s, v]) => `+${v} ${statLabel(s)}`).join("  ");
 }
 function costText(cost) {
   if (!cost) return "";
@@ -55,10 +55,15 @@ export default function InventoryScreen({ onBack }) {
         <Text style={[styles.itemName, { color: c }]}>
           {it.name}
           {it.upgrade ? <Text style={styles.plus}> +{it.upgrade}</Text> : null}
+          {it.forClass && it.forClass !== profile.classId ? <Text style={styles.offClass}>  · off-class</Text> : null}
           <Text style={styles.slotTag}>  · {SLOT_LABEL[it.slot]} · iLv{it.level}</Text>
         </Text>
         <Text style={styles.mods}>{modText(it)}</Text>
-        {!usable && <Text style={styles.locked}>🚫 {it.weaponType ? `Your job can't wield ${it.weaponType}` : "Not for your class"}</Text>}
+        {!usable && (
+          <Text style={styles.locked}>
+            🚫 {it.slot === "weapon" ? `Can't wield ${it.weaponType}` : "Off-class sub-weapon"} — sell or trade
+          </Text>
+        )}
         <View style={styles.actions}>
           {equipped ? (
             <Btn label="Unequip" onPress={() => unequip(slot)} />
@@ -168,6 +173,7 @@ const styles = StyleSheet.create({
   slotLabel: { color: colors.textDim, fontSize: 11, fontWeight: "700", textTransform: "uppercase" },
   itemName: { fontSize: 15, fontWeight: "800" },
   plus: { color: colors.gold, fontSize: 15, fontWeight: "800" },
+  offClass: { color: colors.textDim, fontSize: 11, fontWeight: "600" },
   slotTag: { color: colors.textDim, fontSize: 12, fontWeight: "500" },
   mods: { color: colors.text, fontSize: 13, marginTop: 3 },
   locked: { color: colors.danger, fontSize: 12, marginTop: 3, fontWeight: "600" },

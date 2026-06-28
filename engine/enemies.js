@@ -9,15 +9,17 @@
 // Archetype stat shapes. Enemy basic-attack damage scales off STR (default
 // primary), so brutes hit hardest; swift/tank/trickster trade power for evasion,
 // bulk, or crits.
+// SPD adds to initiative (AGI + SPD); it scales with floor like other stats, so
+// fast monsters increasingly act before you on deeper floors.
 const ARCH = {
-  swift:     { STR: 5, END: 3, AGI: 9, VIT: 3, INT: 2, CHA: 2, LUK: 4 },
+  swift:     { STR: 5, END: 3, AGI: 9, VIT: 3, INT: 2, CHA: 2, LUK: 4, SPD: 6 },
   brute:     { STR: 9, END: 6, AGI: 3, VIT: 5, INT: 1, CHA: 1, LUK: 2 },
   tank:      { STR: 4, END: 8, AGI: 2, VIT: 8, INT: 1, CHA: 1, LUK: 2 },
-  trickster: { STR: 5, END: 4, AGI: 6, VIT: 3, INT: 3, CHA: 3, LUK: 8 },
+  trickster: { STR: 5, END: 4, AGI: 6, VIT: 3, INT: 3, CHA: 3, LUK: 8, SPD: 3 },
   caster:    { STR: 6, END: 4, AGI: 4, VIT: 4, INT: 8, CHA: 4, LUK: 3 },
-  balanced:  { STR: 5, END: 5, AGI: 5, VIT: 5, INT: 3, CHA: 3, LUK: 3 },
-  elite:     { STR: 8, END: 7, AGI: 4, VIT: 6, INT: 3, CHA: 2, LUK: 3 },
-  boss:      { STR: 8, END: 10, AGI: 6, VIT: 9, INT: 5, CHA: 5, LUK: 5 },
+  balanced:  { STR: 5, END: 5, AGI: 5, VIT: 5, INT: 3, CHA: 3, LUK: 3, SPD: 1 },
+  elite:     { STR: 8, END: 7, AGI: 4, VIT: 6, INT: 3, CHA: 2, LUK: 3, SPD: 3 },
+  boss:      { STR: 8, END: 10, AGI: 6, VIT: 9, INT: 5, CHA: 5, LUK: 5, SPD: 4 },
 };
 
 const NORMAL_BASE = {

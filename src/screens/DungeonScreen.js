@@ -177,7 +177,7 @@ export default function DungeonScreen({ onBack }) {
               <Text style={styles.lootTitle}>Loot dropped!</Text>
               {r.loot.map((it) => (
                 <Text key={it.id} style={[styles.lootItem, { color: RARITIES[it.rarity]?.color }]}>
-                  {it.name} — {Object.entries(it.mods).map(([s, v]) => `+${v} ${statLabel(s, it.forClass)}`).join(", ")}
+                  {it.name} — {Object.entries(it.mods).map(([s, v]) => `+${v} ${statLabel(s)}`).join(", ")}
                 </Text>
               ))}
             </View>

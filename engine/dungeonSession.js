@@ -43,7 +43,7 @@ export function createFloorSession({ floor, stats, skills, skillLevels = {}, pri
 
   function finishFloor(outcome, xp, gold) {
     // Loot + materials only drop on a clear; magic find uses the player's Luck.
-    const loot = outcome === "cleared" ? rollLoot(type, floor, stats.LUK || 0, rng, { classId, weaponTypes }) : [];
+    const loot = outcome === "cleared" ? rollLoot(type, floor, stats.LUK || 0, rng, { playerClass: classId, playerWeaponTypes: weaponTypes }) : [];
     const materials = outcome === "cleared" ? rollMaterials(type, floor, stats.LUK || 0, rng) : {};
     result = { outcome, xp, gold, energySpent: cost, wavesCleared, floor, loot, materials, finalHp: player.hp, finalMp: player.mp };
     phase = outcome === "cleared" ? "won" : outcome === "defeat" ? "lost" : "fled";
