@@ -9,8 +9,16 @@ import { useStepSource } from "../steps/useStepSource.js";
 import { unlockedHiddenClasses } from "../../engine/classes.js";
 import ProgressBar from "../components/ProgressBar.js";
 import Avatar from "../components/Avatar.js";
-import { conversionPreview, MAX_ENERGY } from "../game/profile.js";
+import { conversionPreview, msToNextEnergy, MAX_ENERGY } from "../game/profile.js";
 import { colors, spacing } from "../theme.js";
+
+function regenLabel(profile) {
+  if ((profile.energy || 0) >= MAX_ENERGY) return "Energy full";
+  const ms = msToNextEnergy(profile);
+  if (ms == null) return "";
+  const m = Math.ceil(ms / 60000);
+  return `+1⚡ in ~${m} min`;
+}
 
 export default function HomeScreen({ onOpenStats, onOpenDungeon }) {
   const { profile, sheet, ingestSteps, convert, lastEarned, floorCost } = useStride();
@@ -46,6 +54,7 @@ export default function HomeScreen({ onOpenStats, onOpenDungeon }) {
       <View style={styles.card}>
         <ProgressBar label="EXP" value={profile.exp} max={sheet.expToNext} color={colors.exp} />
         <ProgressBar label="Energy" value={profile.energy} max={MAX_ENERGY} color={colors.accent} suffix="⚡" />
+        <Text style={styles.regen}>{regenLabel(profile)}</Text>
         <View style={styles.statRow}>
           <Stat k="Floor" v={profile.floor || 1} />
           <Stat k="Gold" v={profile.gold} />
@@ -174,6 +183,7 @@ const styles = StyleSheet.create({
   pointsBadgeText: { color: colors.bg, fontWeight: "800", fontSize: 13 },
   sectionTitle: { color: colors.text, fontSize: 16, fontWeight: "700", marginBottom: spacing(1) },
   dim: { color: colors.textDim, fontSize: 13, lineHeight: 19 },
+  regen: { color: colors.textDim, fontSize: 11, marginTop: 2, textAlign: "right" },
   statRow: { flexDirection: "row", marginTop: spacing(1.5), justifyContent: "space-between" },
   statCell: { alignItems: "center", flex: 1 },
   statVal: { color: colors.text, fontSize: 16, fontWeight: "700" },

@@ -15,6 +15,7 @@ import {
   applySteps,
   convertSteps,
   applyAllocation,
+  applyEnergyRegen,
   learnSkill,
   applyFloorResult,
   deriveSheet,
@@ -36,19 +37,28 @@ export function StrideProvider({ children }) {
   const profileRef = useRef(null);
   profileRef.current = profile;
 
-  // Load the save once on startup.
+  // Load the save once on startup (and catch up any offline Energy regen).
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const saved = await loadProfile();
       if (!cancelled) {
-        setProfile(saved);
+        setProfile(saved ? applyEnergyRegen(saved) : saved);
         setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // Tick Energy regen every 30s while the app is open. applyEnergyRegen returns
+  // the same object when nothing changed, so this is a no-op render otherwise.
+  useEffect(() => {
+    const id = setInterval(() => {
+      setProfile((p) => (p ? applyEnergyRegen(p) : p));
+    }, 30000);
+    return () => clearInterval(id);
   }, []);
 
   // Persist on every meaningful change (debounced lightly).
@@ -98,8 +108,11 @@ export function StrideProvider({ children }) {
   // engine/dungeonSession.js) the screen drives turn by turn, or null if there
   // isn't enough Energy. Rewards are applied later via commitFloorResult.
   const beginFloorSession = useCallback(() => {
-    const p = profileRef.current;
+    let p = profileRef.current;
     if (!p) return null;
+    // Catch up regen so the freshest Energy total gates the descent.
+    const regen = applyEnergyRegen(p);
+    if (regen !== p) { p = regen; setProfile(p); }
     const floor = p.floor || 1;
     if (p.energy < energyCost(floor)) return null;
     return createFloorSession({

@@ -16,6 +16,9 @@ import {
 
 export const SAVE_VERSION = 1;
 export const MAX_ENERGY = 200; // hard cap on stored Energy
+export const BASE_ENERGY = 100; // starting Energy for a new character
+export const ENERGY_REGEN_MS = 10 * 60 * 1000; // +1 Energy per 10 real minutes
+export const MAX_PER_STAT_PER_ALLOC = 2; // can't pour a whole level (3 pts) into one stat
 
 // Build a fresh profile for a newly chosen base class.
 export function createProfile(classId) {
@@ -34,13 +37,14 @@ export function createProfile(classId) {
     skills: [...cls.skills],
     passives: [],
     skillLevels: {}, // id -> rank, for learned tree skills/passives
-    energy: 0,
+    energy: BASE_ENERGY,
     gold: 0,
     // Deepest floor not yet cleared — the dungeon's "current floor".
     floor: 1,
     // Raw steps waiting to be converted into EXP or Energy by the player.
     totalSteps: 0,
     stepBank: 0,
+    lastEnergyTick: Date.now(), // for time-based Energy regen
     lastSyncAt: Date.now(),
   };
 }
@@ -142,12 +146,43 @@ export function applyFloorResult(profile, result) {
   return { profile: p, levelsGained };
 }
 
+// Regenerate Energy from elapsed real time (+1 per ENERGY_REGEN_MS), up to the
+// cap. Advances lastEnergyTick only by the Energy actually granted so partial
+// progress isn't lost. Returns the SAME profile object when nothing changed, so
+// callers can pass it straight to setState without causing a needless re-render.
+export function applyEnergyRegen(profile, now = Date.now()) {
+  if (!profile) return profile;
+  const energy = profile.energy || 0;
+  const last = profile.lastEnergyTick || profile.createdAt || now;
+
+  if (energy >= MAX_ENERGY) {
+    if (profile.lastEnergyTick === now) return profile;
+    return { ...profile, lastEnergyTick: now }; // keep tick fresh while full
+  }
+
+  const elapsed = now - last;
+  if (elapsed < ENERGY_REGEN_MS) return profile;
+
+  const space = MAX_ENERGY - energy;
+  const gain = Math.min(Math.floor(elapsed / ENERGY_REGEN_MS), space);
+  const newTick = gain >= space ? now : last + gain * ENERGY_REGEN_MS;
+  return { ...profile, energy: energy + gain, lastEnergyTick: newTick };
+}
+
+// Milliseconds until the next +1 Energy (null if full).
+export function msToNextEnergy(profile, now = Date.now()) {
+  if (!profile || (profile.energy || 0) >= MAX_ENERGY) return null;
+  const last = profile.lastEnergyTick || profile.createdAt || now;
+  return Math.max(0, ENERGY_REGEN_MS - ((now - last) % ENERGY_REGEN_MS));
+}
+
 // Commit a batch of stat allocations at once (the Stats screen drafts these and
-// confirms). `alloc` is a map like { STR: 2, AGI: 1 }. Ignores the change if it
-// would overspend. Returns a new profile.
+// confirms). `alloc` is a map like { STR: 2, AGI: 1 }. Rejects overspends and
+// any single stat exceeding the per-allocation cap. Returns a new profile.
 export function applyAllocation(profile, alloc) {
   const spend = Object.values(alloc).reduce((s, n) => s + Math.max(0, n), 0);
   if (spend <= 0 || spend > profile.statPoints) return profile;
+  if (Object.values(alloc).some((n) => n > MAX_PER_STAT_PER_ALLOC)) return profile;
   const stats = { ...profile.stats };
   for (const [stat, n] of Object.entries(alloc)) {
     if (n > 0 && stat in stats) stats[stat] += n;

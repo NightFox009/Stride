@@ -6,6 +6,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { STATS, STAT_NAMES } from "../../engine/stats.js";
 import { BASE_CLASSES } from "../../engine/classes.js";
 import { passiveMods } from "../../engine/passives.js";
+import { MAX_PER_STAT_PER_ALLOC } from "../game/profile.js";
 import { useStride } from "../state/StrideContext.js";
 import RadarChart from "../components/RadarChart.js";
 import { colors, spacing, STAT_COLORS } from "../theme.js";
@@ -22,7 +23,10 @@ export default function StatsScreen({ onBack, onOpenSkills }) {
   const pointsLeft = profile.statPoints - draftTotal;
   const boost = BASE_CLASSES[profile.classId]?.boost;
 
-  const inc = (stat) => pointsLeft > 0 && setDraft((d) => ({ ...d, [stat]: d[stat] + 1 }));
+  const inc = (stat) =>
+    pointsLeft > 0 &&
+    draft[stat] < MAX_PER_STAT_PER_ALLOC &&
+    setDraft((d) => ({ ...d, [stat]: d[stat] + 1 }));
   const dec = (stat) => draft[stat] > 0 && setDraft((d) => ({ ...d, [stat]: d[stat] - 1 }));
   const reset = () => setDraft(emptyDraft());
   const confirm = () => {
@@ -48,6 +52,9 @@ export default function StatsScreen({ onBack, onOpenSkills }) {
       <Text style={styles.title}>Stats</Text>
       <Text style={styles.points}>
         {pointsLeft} point{pointsLeft === 1 ? "" : "s"} to spend
+      </Text>
+      <Text style={styles.allocHint}>
+        Max {MAX_PER_STAT_PER_ALLOC} per stat each time you Confirm — spread your build.
       </Text>
 
       <View style={[styles.card, styles.radarCard]}>
@@ -78,9 +85,13 @@ export default function StatsScreen({ onBack, onOpenSkills }) {
                 <Text style={styles.stepText}>－</Text>
               </Pressable>
               <Pressable
-                disabled={pointsLeft <= 0}
+                disabled={pointsLeft <= 0 || pending >= MAX_PER_STAT_PER_ALLOC}
                 onPress={() => inc(stat)}
-                style={[styles.step, styles.stepPlus, pointsLeft <= 0 && styles.stepOff]}
+                style={[
+                  styles.step,
+                  styles.stepPlus,
+                  (pointsLeft <= 0 || pending >= MAX_PER_STAT_PER_ALLOC) && styles.stepOff,
+                ]}
               >
                 <Text style={styles.stepText}>＋</Text>
               </Pressable>
@@ -149,7 +160,8 @@ const styles = StyleSheet.create({
   back: { marginBottom: spacing(1) },
   backText: { color: colors.exp, fontSize: 15, fontWeight: "700" },
   title: { color: colors.text, fontSize: 28, fontWeight: "800" },
-  points: { color: colors.accent, fontSize: 14, fontWeight: "700", marginBottom: spacing(2) },
+  points: { color: colors.accent, fontSize: 14, fontWeight: "700" },
+  allocHint: { color: colors.textDim, fontSize: 12, marginBottom: spacing(2), marginTop: 2 },
   card: {
     backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1,
     borderRadius: 14, padding: spacing(2), marginBottom: spacing(2),
