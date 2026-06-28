@@ -8,7 +8,7 @@ import { derive } from "../../engine/stats.js";
 import { effectiveStats, treeFor, maxLevelFor, rankLevelReq } from "../../engine/classTree.js";
 import { getJob, jobsFor, JOB_LEVEL, classWeaponTypes } from "../../engine/jobs.js";
 import { equipmentMods, SLOTS, CLASS_GEAR } from "../../engine/items.js";
-import { idleRewards } from "../../engine/knowledge.js";
+import { idleRewards, knowledgeStatBonus } from "../../engine/knowledge.js";
 import {
   upgradeCost,
   rarityUpgradeCost,
@@ -85,6 +85,9 @@ export function combatStats(profile) {
   if (job) for (const [k, v] of Object.entries(job.mods || {})) s[k] = (s[k] || 0) + v;
   const eq = equipmentMods(profile.equipment || {});
   for (const [k, v] of Object.entries(eq)) s[k] = (s[k] || 0) + v;
+  // Knowledge: each studied monster grants its reward stat.
+  const kb = knowledgeStatBonus(profile.knowledge || {});
+  for (const [k, v] of Object.entries(kb)) s[k] = (s[k] || 0) + v;
   return s;
 }
 

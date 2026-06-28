@@ -36,7 +36,6 @@ import {
 } from "../game/profile.js";
 import { createFloorSession } from "../../engine/dungeonSession.js";
 import { energyCost } from "../../engine/floors.js";
-import { knowledgeDamage } from "../../engine/knowledge.js";
 import { createRng } from "../../engine/rng.js";
 
 const StrideContext = createContext(null);
@@ -164,7 +163,6 @@ export function StrideProvider({ children }) {
       primaryStat: primaryStatOf(p),
       weaponTypes: allowedWeaponTypes(p),
       classId: p.classId,
-      knowledgeDmg: knowledgeDamage(p.knowledge || {}),
       startHP: v.hp,
       startMP: v.mp,
       level: p.level,

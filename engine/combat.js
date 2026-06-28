@@ -13,7 +13,7 @@ import { SKILLS } from "./skills.js";
 import { createRng } from "./rng.js";
 
 // Build a live combatant from a stat block.
-export function makeCombatant({ name, stats, skills = [], skillLevels = {}, primaryStat = "STR", knowledgeDmg = {}, isPlayer = false, hp = null, bonusHP = 0 }) {
+export function makeCombatant({ name, stats, skills = [], skillLevels = {}, primaryStat = "STR", isPlayer = false, hp = null, bonusHP = 0 }) {
   const maxHP = (hp != null ? hp : derive.maxHP(stats)) + bonusHP;
   return {
     name,
@@ -22,7 +22,6 @@ export function makeCombatant({ name, stats, skills = [], skillLevels = {}, prim
     skills,
     skillLevels,
     primaryStat,
-    knowledgeDmg, // { enemyTemplateId: damage fraction } — bonus vs studied monsters
     hp: maxHP,
     maxHP,
     mp: derive.maxMP(stats),
@@ -41,10 +40,6 @@ function dealDamage(rng, attacker, target, rawAmount, type, opts = {}) {
     return { type: "dodge", attacker: attacker.name, target: target.name };
   }
   let amount = rawAmount;
-  // Knowledge: the player deals bonus damage to monsters they've studied.
-  if (attacker.isPlayer && attacker.knowledgeDmg && target.templateId) {
-    amount *= 1 + (attacker.knowledgeDmg[target.templateId] || 0);
-  }
   const crit = derive.critChance(attacker.stats) + (opts.critBonus || 0);
   const isCrit = rng.chance(crit);
   if (isCrit) amount *= derive.critMult(attacker.stats);

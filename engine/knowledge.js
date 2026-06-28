@@ -12,9 +12,11 @@ import { ZONES, zoneForFloor } from "./zones.js";
 import { floorType } from "./floors.js";
 
 // Knowledge tiers: tier 1 at 12 cores, tier 2 at 24, tier 3 at 36, … Each tier
-// grants bonus damage AGAINST that specific monster.
+// grants a permanent bonus to the monster's reward STAT (goblins → HP/VIT,
+// slimes → attack/STR, etc.). Elites/bosses grant more per tier.
 export const CORE_TIER_SIZE = 12;
-export const DMG_PER_TIER = 0.05; // +5% damage vs that monster per tier
+export const STAT_PER_TIER = 2; // reward-stat points per tier (normal monster)
+export const KIND_MULT = { normal: 1, elite: 2, boss: 3 };
 export const COMBAT_CORE_CHANCE = 0.12; // per monster type, per cleared floor
 export const IDLE_CAP_MS = 8 * 60 * 60 * 1000; // offline idle accrues up to 8h
 
@@ -31,14 +33,24 @@ export function tieredCount(knowledge = {}) {
 export function nextTierAt(cores = 0) {
   return (knowledgeTier(cores) + 1) * CORE_TIER_SIZE;
 }
-// Per-monster bonus-damage map used in combat: { enemyId: fraction }.
-export function knowledgeDamage(knowledge = {}) {
-  const out = {};
-  for (const [id, c] of Object.entries(knowledge)) {
-    const t = knowledgeTier(c);
-    if (t > 0) out[id] = t * DMG_PER_TIER;
+// The reward stat + amount a monster currently grants (for the UI).
+export function monsterReward(monster, cores = 0) {
+  if (!monster || !monster.reward) return null;
+  const tier = knowledgeTier(cores);
+  const amount = tier * STAT_PER_TIER * (KIND_MULT[monster.kind] || 1);
+  return { stat: monster.reward, tier, amount };
+}
+
+// Total stat bonuses from the whole knowledge book: { STAT: total }. Each
+// studied monster contributes its reward stat scaled by tier (and kind).
+export function knowledgeStatBonus(knowledge = {}) {
+  const mods = {};
+  for (const [id, cores] of Object.entries(knowledge)) {
+    const m = ENEMIES[id];
+    const r = monsterReward(m, cores);
+    if (r && r.amount > 0) mods[r.stat] = (mods[r.stat] || 0) + r.amount;
   }
-  return out;
+  return mods;
 }
 
 // Monster ids that appear on a floor (its zone pool + the floor's elite/boss).

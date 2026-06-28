@@ -5,7 +5,7 @@ import React from "react";
 import { View, Text, ScrollView, StyleSheet } from "react-native";
 import {
   bestiaryByZone, knowledgeTier, nextTierAt, tieredCount, discoveredCount,
-  CORE_TIER_SIZE, DMG_PER_TIER,
+  monsterReward, CORE_TIER_SIZE,
 } from "../../engine/knowledge.js";
 import { useStride } from "../state/StrideContext.js";
 import { colors, spacing } from "../theme.js";
@@ -24,8 +24,8 @@ export default function KnowledgeScreen({ onBack }) {
       <Text style={styles.title}>Knowledge Book</Text>
       <Text style={styles.sub}>
         Discovered {discovered}/{total} · {tiered} monster{tiered === 1 ? "" : "s"} ranked up
-        {"\n"}Every {CORE_TIER_SIZE} cores of a monster raises its tier — each tier is
-        +{Math.round(DMG_PER_TIER * 100)}% damage against THAT monster.
+        {"\n"}Every {CORE_TIER_SIZE} cores raises a monster's tier — each tier grants its
+        reward stat (elites ×2, bosses ×3), permanently.
       </Text>
 
       {zones.map((z) => (
@@ -33,14 +33,14 @@ export default function KnowledgeScreen({ onBack }) {
           <Text style={styles.zoneName}>{z.name}</Text>
           {z.monsters.map((m) => {
             const cores = k[m.id] || 0;
-            const tier = knowledgeTier(cores);
             const found = cores > 0;
+            const r = monsterReward(m, cores);
             return (
               <View key={m.id} style={styles.row}>
                 <Text style={[styles.mName, !found && styles.unknown]}>
                   {found ? m.name : "???"}
-                  {tier > 0 ? <Text style={styles.studied}>  ✦ T{tier} · +{Math.round(tier * DMG_PER_TIER * 100)}%</Text> : null}
-                  {m.kind !== "normal" ? <Text style={styles.kind}>  · {m.kind}</Text> : null}
+                  <Text style={styles.kind}>  · gives {m.reward}</Text>
+                  {r && r.tier > 0 ? <Text style={styles.studied}>  ✦ T{r.tier} +{r.amount} {m.reward}</Text> : null}
                 </Text>
                 <Text style={styles.cores}>{cores}/{nextTierAt(cores)}</Text>
               </View>

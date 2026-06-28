@@ -31,22 +31,29 @@ const NORMAL_BASE = {
   caster:    { hp: 20, xp: 7, gold: 5 },
 };
 
-function norm(id, name, arch) {
+// `reward` is the stat a monster grants in the knowledge book (per tier). Default
+// follows the archetype; some are overridden for flavour.
+const REWARD = {
+  swift: "AGI", brute: "STR", tank: "VIT", trickster: "LUK",
+  caster: "INT", balanced: "END", elite: "CHA", boss: "END",
+};
+
+function norm(id, name, arch, reward = REWARD[arch]) {
   const b = NORMAL_BASE[arch];
-  return { id, name, kind: "normal", hp: b.hp, xp: b.xp, gold: b.gold, stats: ARCH[arch] };
+  return { id, name, kind: "normal", hp: b.hp, xp: b.xp, gold: b.gold, stats: ARCH[arch], reward };
 }
-function elite(id, name) {
-  return { id, name, kind: "elite", hp: 90, xp: 18, gold: 14, stats: ARCH.elite };
+function elite(id, name, reward = REWARD.elite) {
+  return { id, name, kind: "elite", hp: 90, xp: 18, gold: 14, stats: ARCH.elite, reward };
 }
-function boss(id, name) {
-  return { id, name, kind: "boss", hp: 200, xp: 60, gold: 50, stats: ARCH.boss };
+function boss(id, name, reward = REWARD.boss) {
+  return { id, name, kind: "boss", hp: 200, xp: 60, gold: 50, stats: ARCH.boss, reward };
 }
 
 const ROSTER = [
   // Zone 1 — Ratwarren Caves
   norm("cave_rat", "Cave Rat", "swift"),
-  norm("goblin", "Goblin Skirmisher", "balanced"),
-  norm("slime", "Cave Slime", "tank"),
+  norm("goblin", "Goblin Skirmisher", "balanced", "VIT"), // HP
+  norm("slime", "Cave Slime", "tank", "STR"), // attack
   elite("goblin_brute", "Goblin Brute"),
   boss("goblin_warlord", "Goblin Warlord"),
 

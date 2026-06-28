@@ -24,10 +24,10 @@ function betweenWaveRecovery(player) {
 
 // Returns a controller: snapshot() for the current view, and act()/attack()/
 // skill()/flee() to take the player's turn. Non-combat floors resolve instantly.
-export function createFloorSession({ floor, stats, skills, skillLevels = {}, primaryStat = "STR", weaponTypes = null, classId = "knight", knowledgeDmg = {}, startHP = null, startMP = null, level = 1, rng = createRng() }) {
+export function createFloorSession({ floor, stats, skills, skillLevels = {}, primaryStat = "STR", weaponTypes = null, classId = "knight", startHP = null, startMP = null, level = 1, rng = createRng() }) {
   const cost = energyCost(floor);
   const { type, waves } = buildWaves(floor, rng);
-  const player = makeCombatant({ name: "You", stats, skills, skillLevels, primaryStat, knowledgeDmg, isPlayer: true, bonusHP: levelHpBonus(level) });
+  const player = makeCombatant({ name: "You", stats, skills, skillLevels, primaryStat, isPlayer: true, bonusHP: levelHpBonus(level) });
   // Start from carried HP/MP (rest floors will restore to full below).
   if (startHP != null) player.hp = Math.max(1, Math.min(player.maxHP, startHP));
   if (startMP != null) player.mp = Math.max(0, Math.min(player.maxMP, startMP));
