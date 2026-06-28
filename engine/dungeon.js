@@ -19,7 +19,7 @@ function betweenWaveRecovery(player) {
 
 // player: a profile-like { stats, skills } (we build the live combatant here).
 // Returns { outcome, events, wavesCleared, xp, gold, energySpent, player }.
-export function runFloor({ floor, stats, skills, choose, rng, energy, level = 1 }) {
+export function runFloor({ floor, stats, skills, choose, rng, energy, level = 1, primaryStat = "STR" }) {
   const events = [];
   const emit = (e) => { events.push(e); return e; };
 
@@ -32,7 +32,7 @@ export function runFloor({ floor, stats, skills, choose, rng, energy, level = 1 
   const { type, waves } = buildWaves(floor, rng);
   emit({ type: "floorStart", floor, floorType: type, waves: waves.length, energyCost: cost });
 
-  const player = makeCombatant({ name: "You", stats, skills, isPlayer: true, bonusHP: levelHpBonus(level) });
+  const player = makeCombatant({ name: "You", stats, skills, primaryStat, isPlayer: true, bonusHP: levelHpBonus(level) });
 
   // ── Non-combat floors ────────────────────────────────────────
   if (type === "treasure") {

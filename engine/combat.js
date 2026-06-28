@@ -13,7 +13,7 @@ import { SKILLS } from "./skills.js";
 import { createRng } from "./rng.js";
 
 // Build a live combatant from a stat block.
-export function makeCombatant({ name, stats, skills = [], skillLevels = {}, isPlayer = false, hp = null, bonusHP = 0 }) {
+export function makeCombatant({ name, stats, skills = [], skillLevels = {}, primaryStat = "STR", isPlayer = false, hp = null, bonusHP = 0 }) {
   const maxHP = (hp != null ? hp : derive.maxHP(stats)) + bonusHP;
   return {
     name,
@@ -21,6 +21,7 @@ export function makeCombatant({ name, stats, skills = [], skillLevels = {}, isPl
     isPlayer,
     skills,
     skillLevels,
+    primaryStat,
     hp: maxHP,
     maxHP,
     mp: derive.maxMP(stats),
@@ -68,7 +69,7 @@ function enemyAction(rng, enemy, players) {
   const targets = players.filter(isAlive);
   if (targets.length === 0) return null;
   const target = rng.pick(targets);
-  return dealDamage(rng, enemy, target, derive.attack(enemy.stats), "physical");
+  return dealDamage(rng, enemy, target, derive.attack(enemy.stats, enemy.primaryStat), "physical");
 }
 
 function firstAlive(enemies) {
@@ -81,7 +82,7 @@ function basicAttack(rng, player, enemies, targetIndex, emit) {
   const target = enemies[idx];
   if (!target) return;
   emit({ type: "attack", actor: player.name, target: target.name });
-  emit(dealDamage(rng, player, target, derive.attack(player.stats), "physical"));
+  emit(dealDamage(rng, player, target, derive.attack(player.stats, player.primaryStat), "physical"));
 }
 
 function resolveTargets(targetType, player, enemies, targetIndex) {

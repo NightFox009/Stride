@@ -21,6 +21,7 @@ import {
   applyFloorResult,
   deriveSheet,
   combatStats,
+  primaryStatOf,
 } from "../game/profile.js";
 import { createFloorSession } from "../../engine/dungeonSession.js";
 import { energyCost } from "../../engine/floors.js";
@@ -125,6 +126,7 @@ export function StrideProvider({ children }) {
       stats: combatStats(p), // base + passives + job perk
       skills: p.skills,
       skillLevels: p.skillLevels || {},
+      primaryStat: primaryStatOf(p),
       level: p.level,
       rng: createRng(),
     });

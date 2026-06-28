@@ -24,7 +24,9 @@ export function makeStats(overrides = {}) {
 export const derive = {
   maxHP: (s) => 30 + s.END * 6 + s.VIT * 4,
   maxMP: (s) => 20 + s.INT * 5,
-  attack: (s) => s.STR * 3,
+  // Basic attack scales off the wielder's PRIMARY stat (the class's signature
+  // stat). Defaults to STR for enemies and anything class-agnostic.
+  attack: (s, primary = "STR") => (s[primary] || 0) * 3,
   skillPower: (s) => s.INT * 2,
   critChance: (s) => clamp(5 + s.LUK * 0.5, 0, 75), // %
   critMult: () => 1.75,

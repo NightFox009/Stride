@@ -67,6 +67,13 @@ export function combatStats(profile) {
   return s;
 }
 
+// The stat that drives basic-attack damage: the awakened job's primary stat, or
+// otherwise the class's signature stat.
+export function primaryStatOf(profile) {
+  const job = getJob(profile.job);
+  return job?.primary || BASE_CLASSES[profile.classId]?.boost || "STR";
+}
+
 // Per-job qualification against plain stat-value thresholds (checked on your
 // stats including passives). Returns the requirement rows the UI renders.
 export function jobProgress(profile, job) {
@@ -113,7 +120,7 @@ export function deriveSheet(profile) {
   return {
     maxHP: derive.maxHP(s) + levelHpBonus(profile.level),
     maxMP: derive.maxMP(s),
-    attack: derive.attack(s),
+    attack: derive.attack(s, primaryStatOf(profile)),
     skillPower: derive.skillPower(s),
     critChance: derive.critChance(s),
     dodgeChance: derive.dodgeChance(s),

@@ -49,11 +49,11 @@ function policy(player, enemies, rng) {
 }
 
 function clearRate(classId, level, floor, trials) {
-  const { stats, skills } = buildCharacter(classId, level);
+  const { cls, stats, skills } = buildCharacter(classId, level);
   let clears = 0, totalWaves = 0;
   for (let t = 0; t < trials; t++) {
     const rng = createRng(1000 + t * 7 + floor * 13);
-    const r = runFloor({ floor, stats, skills, choose: policy, rng, energy: 9999, level });
+    const r = runFloor({ floor, stats, skills, choose: policy, rng, energy: 9999, level, primaryStat: cls.boost });
     if (r.outcome === "cleared") clears++;
     totalWaves += r.wavesCleared;
   }

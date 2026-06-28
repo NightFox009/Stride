@@ -127,6 +127,7 @@ const floorResult = runFloor({
   rng,
   energy: profile.energy,
   level: profile.level,
+  primaryStat: cls.boost,
 });
 render(floorResult.events);
 hr();
