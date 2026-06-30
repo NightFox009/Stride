@@ -11,6 +11,7 @@ import { equipmentMods, SLOTS, CLASS_GEAR } from "../../engine/items.js";
 import { knowledgeBonuses, IDLE_CAP_MS } from "../../engine/knowledge.js";
 import { createFloorSession } from "../../engine/dungeonSession.js";
 import { createRng } from "../../engine/rng.js";
+import { UPGRADES, upgradeGoldCost, upgradeMax, upgradeBonuses } from "../../engine/upgrades.js";
 import {
   upgradeCost,
   rarityUpgradeCost,
@@ -53,6 +54,7 @@ export function createProfile(classId) {
     equipment: { weapon: null, subweapon: null, helm: null, armor: null, gloves: null, boots: null, accessory: null },
     materials: {}, // crafting materials: { matId: count }
     knowledge: {}, // bestiary: { enemyId: coreCount }
+    upgrades: {}, // gold upgrades: { upgradeId: level }
     currentHP: null, // carried HP between floors (null = full)
     currentMP: null, // carried MP between floors (null = full)
     lastRestTick: Date.now(), // for time-based HP/MP regen
@@ -143,22 +145,24 @@ export function awakenJob(profile, jobId) {
 export function deriveSheet(profile) {
   const s = combatStats(profile);
   const kb = knowledgeBonuses(profile.knowledge || {});
+  const ub = upgradeBonuses(profile.upgrades || {}); // flat gold-upgrade bonuses
   return {
-    maxHP: derive.maxHP(s) + levelHpBonus(profile.level) + (kb.hp || 0),
+    maxHP: derive.maxHP(s) + levelHpBonus(profile.level) + (kb.hp || 0) + ub.maxHP,
     maxMP: derive.maxMP(s),
-    attack: derive.attack(s, primaryStatOf(profile)),
-    defense: derive.defense(s),
-    magicAttack: derive.magicAttack(s),
-    magicDefense: derive.magicDefense(s),
+    attack: derive.attack(s, primaryStatOf(profile)) + ub.attack,
+    defense: derive.defense(s) + ub.defense,
+    magicAttack: derive.magicAttack(s) + ub.magicAttack,
+    magicDefense: derive.magicDefense(s) + ub.magicDefense,
     skillPower: derive.skillPower(s),
-    critChance: derive.critChance(s),
-    critMult: derive.critMult(s), // crit damage multiplier
+    critChance: derive.critChance(s) + ub.critChance,
+    critMult: derive.critMult(s) + ub.critMult, // crit damage multiplier
     evasion: derive.evasion(s),
     accuracy: derive.accuracy(s),
     dodgeChance: derive.dodgeChance(s),
     fleeChance: derive.fleeChance(s),
-    speed: derive.speed(s), // initiative / attack speed
-    hpRegen: derive.hpRegenPerFloor(s) + (kb.hpRegen || 0), // between-wave HP recovery
+    speed: derive.speed(s) + ub.speed, // initiative / attack speed
+    lifesteal: ub.lifesteal, // fraction of damage healed
+    hpRegen: derive.hpRegenPerFloor(s) + (kb.hpRegen || 0) + ub.hpRegen, // between-wave HP recovery
     expToNext: Math.round(TUNING.baseXP * Math.pow(profile.level, 1.5)),
   };
 }
@@ -223,6 +227,7 @@ export function applyFloorResult(profile, result) {
 export function floorSessionInputs(profile, rng = createRng()) {
   const v = vitals(profile);
   const kb = knowledgeHpBonuses(profile);
+  const ub = upgradeBonuses(profile.upgrades || {});
   return {
     floor: profile.floor || 1,
     stats: combatStats(profile),
@@ -231,13 +236,28 @@ export function floorSessionInputs(profile, rng = createRng()) {
     primaryStat: primaryStatOf(profile),
     weaponTypes: allowedWeaponTypes(profile),
     classId: profile.classId,
-    knowledgeHP: kb.hp,
-    knowledgeRegen: kb.hpRegen,
+    // Max-HP and between-wave regen bonuses ride the existing params; the rest
+    // (attack/crit/defense/lifesteal/speed) go in via the combat `bonuses` object.
+    knowledgeHP: kb.hp + ub.maxHP,
+    knowledgeRegen: kb.hpRegen + ub.hpRegen,
+    bonuses: ub,
     startHP: v.hp,
     startMP: v.mp,
     level: profile.level,
     rng,
   };
+}
+
+// ── Gold upgrades (the gold sink) ────────────────────────────
+// Buy one level of a gold upgrade if affordable and not maxed.
+export function buyUpgrade(profile, id) {
+  const u = UPGRADES[id];
+  if (!u) return profile;
+  const lvl = (profile.upgrades || {})[id] || 0;
+  if (lvl >= upgradeMax(id)) return profile;
+  const cost = upgradeGoldCost(id, lvl);
+  if ((profile.gold || 0) < cost) return profile;
+  return { ...profile, gold: profile.gold - cost, upgrades: { ...(profile.upgrades || {}), [id]: lvl + 1 } };
 }
 
 // Stat-point spend order: the class's primary first, then bulk (VIT/END), then

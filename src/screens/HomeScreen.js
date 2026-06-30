@@ -22,7 +22,7 @@ function awayLabel(minutes) {
   return `${minutes}m`;
 }
 
-export default function HomeScreen({ onOpenStats, onOpenDungeon, onOpenInventory, onOpenKnowledge }) {
+export default function HomeScreen({ onOpenStats, onOpenDungeon, onOpenInventory, onOpenKnowledge, onOpenUpgrades }) {
   const { profile, sheet, vitals, offlineReport, dismissOfflineReport } = useStride();
 
   const hidden = unlockedHiddenClasses(profile.stats);
@@ -131,6 +131,11 @@ export default function HomeScreen({ onOpenStats, onOpenDungeon, onOpenInventory
       <Pressable style={styles.statsLink} onPress={onOpenInventory}>
         <Text style={styles.statsLinkText}>
           Gear & inventory{(profile.inventory?.length || 0) > 0 ? `  ·  ${profile.inventory.length}` : ""} →
+        </Text>
+      </Pressable>
+      <Pressable style={styles.statsLink} onPress={onOpenUpgrades}>
+        <Text style={[styles.statsLinkText, { color: colors.gold }]}>
+          Gold upgrades  ·  {(profile.gold || 0).toLocaleString()}g →
         </Text>
       </Pressable>
       <Pressable style={styles.statsLink} onPress={onOpenKnowledge}>

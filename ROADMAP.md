@@ -18,9 +18,14 @@ The gameplay/concept layer is complete. The self-driving loop:
    cores. EXP → levels → stat points (+ skill points) and flat HP per level.
 3. **Die → auto-revive** — on death you keep all XP earned and respawn at full HP
    on the same floor to try again (toggle off to stop on death).
-4. **Grow** — spend stat points (or **auto-allocate**), equip loot (or
-   **auto-equip**), learn skills, awaken a job, study the bestiary for permanent
-   bonuses. Builds matter: the 2/3 focus cap forces a real spread.
+4. **Grow** — spend stat points (or **auto-allocate** on a recommended per-class
+   priority; manual allocation always available when auto is off), equip loot (or
+   **auto-equip**), learn skills, awaken a job, study the bestiary, and spend
+   **gold** on permanent **Upgrades** (Power, Vitality, Guard, Regen, Precision,
+   Ferocity, Lifesteal, Haste) — the main gold sink. Builds matter: the 2/3 focus
+   cap forces a real spread.
+
+   *Every floor is a fight* (combat/elite/boss — no rest/treasure detours).
 5. **Idle** — while away, the real auto-battler **fast-forwards** your climb
    (capped 8h): floors, loot, levels — summarized on return.
 

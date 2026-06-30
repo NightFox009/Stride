@@ -28,6 +28,7 @@ import {
   floorSessionInputs,
   autoAllocateStats,
   autoEquipUpgrades,
+  buyUpgrade,
 } from "../game/profile.js";
 import { createFloorSession } from "../../engine/dungeonSession.js";
 import { createRng } from "../../engine/rng.js";
@@ -124,6 +125,9 @@ export function StrideProvider({ children }) {
   const craft = useCallback((itemId) => {
     setProfile((p) => (p ? craftItemRarity(p, itemId, createRng()) : p));
   }, []);
+  const purchaseUpgrade = useCallback((id) => {
+    setProfile((p) => (p ? buyUpgrade(p, id) : p));
+  }, []);
 
   const setAutoAllocate = useCallback((on) => {
     setProfile((p) => {
@@ -183,6 +187,7 @@ export function StrideProvider({ children }) {
     sell,
     upgrade,
     craft,
+    purchaseUpgrade,
     setAutoAllocate,
     setAutoEquip,
     beginFloorSession,

@@ -7,11 +7,11 @@ import { zoneForFloor } from "./zones.js";
 export const WAVES_PER_COMBAT_FLOOR = 10;
 export const BOSS_EVERY = 10;
 
+// Every floor is a fight now: boss every 10th, elite every 5th, else combat.
+// (Non-combat "treasure"/"rest" floors were removed — the climb is pure combat.)
 export function floorType(floor) {
   if (floor % BOSS_EVERY === 0) return "boss";
   if (floor % 5 === 0) return "elite";
-  if (floor % 7 === 0) return "treasure";
-  if (floor % 4 === 0) return "rest";
   return "combat";
 }
 
@@ -37,10 +37,6 @@ export function buildWaves(floor, rng) {
 
   if (type === "elite") {
     return { type, waves: [[spawn(zone.elite, { floor, wave: 1 })]] };
-  }
-
-  if (type === "treasure" || type === "rest") {
-    return { type, waves: [] }; // non-combat, handled by UI/run logic
   }
 
   // standard combat floor: 10 waves, last is the zone's elite as a mini-boss

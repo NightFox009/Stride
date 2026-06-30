@@ -12,8 +12,11 @@ import { derive, MIN_HIT_CHANCE } from "./stats.js";
 import { SKILLS } from "./skills.js";
 import { createRng } from "./rng.js";
 
-// Build a live combatant from a stat block.
-export function makeCombatant({ name, stats, skills = [], skillLevels = {}, primaryStat = "STR", isPlayer = false, hp = null, bonusHP = 0 }) {
+// Build a live combatant from a stat block. `bonuses` are flat gold-upgrade
+// additions to derived attributes (attack, critChance, critMult, defense,
+// magicDefense, lifesteal, speed); maxHP/hpRegen bonuses arrive via bonusHP and
+// the between-wave recovery instead.
+export function makeCombatant({ name, stats, skills = [], skillLevels = {}, primaryStat = "STR", isPlayer = false, hp = null, bonusHP = 0, bonuses = {} }) {
   const maxHP = (hp != null ? hp : derive.maxHP(stats)) + bonusHP;
   return {
     name,
@@ -22,6 +25,7 @@ export function makeCombatant({ name, stats, skills = [], skillLevels = {}, prim
     skills,
     skillLevels,
     primaryStat,
+    bonuses,
     hp: maxHP,
     maxHP,
     mp: derive.maxMP(stats),
@@ -32,6 +36,9 @@ export function makeCombatant({ name, stats, skills = [], skillLevels = {}, prim
 }
 
 const isAlive = (c) => c.hp > 0;
+
+// Turn order: derived Speed plus any Haste upgrade.
+const effSpeed = (c) => derive.speed(c.stats) + (c.bonuses?.speed || 0);
 
 // Core damage application — shared by attacks and skills.
 function dealDamage(rng, attacker, target, rawAmount, type, opts = {}) {
@@ -44,16 +51,24 @@ function dealDamage(rng, attacker, target, rawAmount, type, opts = {}) {
   if (!rng.chance(hitChance)) {
     return { type: "miss", attacker: attacker.name, target: target.name };
   }
-  let amount = rawAmount;
-  const crit = derive.critChance(attacker.stats) + (opts.critBonus || 0);
+  const ab = attacker.bonuses || {};
+  const tb = target.bonuses || {};
+  // Flat Power upgrade adds to every hit (basic attacks AND skills).
+  let amount = rawAmount + (type === "magic" ? (ab.magicAttack || 0) : (ab.attack || 0));
+  const crit = derive.critChance(attacker.stats) + (opts.critBonus || 0) + (ab.critChance || 0);
   const isCrit = rng.chance(crit);
-  if (isCrit) amount *= derive.critMult(attacker.stats);
+  if (isCrit) amount *= derive.critMult(attacker.stats) + (ab.critMult || 0);
   // Mitigation: physical hits are reduced by Defense, magic by Magic Defense.
-  const def = type === "magic" ? derive.magicDefense(target.stats) : derive.defense(target.stats);
+  const def = (type === "magic" ? derive.magicDefense(target.stats) + (tb.magicDefense || 0)
+                                : derive.defense(target.stats) + (tb.defense || 0));
   amount *= 100 / (100 + Math.max(0, def));
   if (target.guard) amount *= 0.5;
   amount = Math.max(1, Math.round(amount));
   target.hp = Math.max(0, target.hp - amount);
+  // Lifesteal: heal the attacker for a fraction of damage dealt.
+  if (ab.lifesteal > 0 && amount > 0) {
+    attacker.hp = Math.min(attacker.maxHP, attacker.hp + Math.max(1, Math.round(amount * ab.lifesteal)));
+  }
   return {
     type: "damage",
     attacker: attacker.name,
@@ -178,7 +193,7 @@ export function createBattle({ player, enemies, rng = createRng(), maxRounds = 1
         emit({ type: "round", round });
         queue = [player, ...enemies]
           .filter(isAlive)
-          .sort((a, b) => derive.speed(b.stats) - derive.speed(a.stats));
+          .sort((a, b) => effSpeed(b) - effSpeed(a));
       }
 
       const actor = queue.shift();

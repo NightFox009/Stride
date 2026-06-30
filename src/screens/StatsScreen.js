@@ -68,6 +68,7 @@ export default function StatsScreen({ onBack, onOpenSkills, onOpenJobs }) {
     { k: "Critical", v: pv.critChance, d: pv.critChance - sheet.critChance, pct: true },
     // Extra detail below the core ten.
     { k: "Crit Damage", v: pv.critMult, d: pv.critMult - sheet.critMult, mult: true },
+    { k: "Lifesteal", v: pv.lifesteal, d: pv.lifesteal - sheet.lifesteal, mult: true },
     { k: "Skill Power", v: pv.skillPower, d: pv.skillPower - sheet.skillPower },
     { k: "HP Regen / floor", v: pv.hpRegen, d: pv.hpRegen - sheet.hpRegen },
     { k: "Flee Chance", v: pv.fleeChance, d: pv.fleeChance - sheet.fleeChance, pct: true },

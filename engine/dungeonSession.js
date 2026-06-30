@@ -24,10 +24,10 @@ function betweenWaveRecovery(player, regenBonus = 0) {
 
 // Returns a controller: snapshot() for the current view, and act()/attack()/
 // skill()/flee() to take the player's turn. Non-combat floors resolve instantly.
-export function createFloorSession({ floor, stats, skills, skillLevels = {}, primaryStat = "STR", weaponTypes = null, classId = "knight", knowledgeHP = 0, knowledgeRegen = 0, startHP = null, startMP = null, level = 1, rng = createRng() }) {
+export function createFloorSession({ floor, stats, skills, skillLevels = {}, primaryStat = "STR", weaponTypes = null, classId = "knight", knowledgeHP = 0, knowledgeRegen = 0, bonuses = {}, startHP = null, startMP = null, level = 1, rng = createRng() }) {
   const { type, waves } = buildWaves(floor, rng);
-  const player = makeCombatant({ name: "You", stats, skills, skillLevels, primaryStat, isPlayer: true, bonusHP: levelHpBonus(level) + knowledgeHP });
-  // Start from carried HP/MP (rest floors will restore to full below).
+  const player = makeCombatant({ name: "You", stats, skills, skillLevels, primaryStat, isPlayer: true, bonusHP: levelHpBonus(level) + knowledgeHP, bonuses });
+  // Start from carried HP/MP.
   if (startHP != null) player.hp = Math.max(1, Math.min(player.maxHP, startHP));
   if (startMP != null) player.mp = Math.max(0, Math.min(player.maxMP, startMP));
 
@@ -103,19 +103,8 @@ export function createFloorSession({ floor, stats, skills, skillLevels = {}, pri
     }
   }
 
-  // ── Non-combat floors resolve immediately ──
-  if (type === "treasure") {
-    const gold = Math.round((20 + floor * 5) * (1 + stats.LUK * 0.02));
-    emit({ type: "treasure", floor, gold });
-    finishFloor("cleared", 0, gold);
-  } else if (type === "rest") {
-    player.hp = player.maxHP;
-    player.mp = player.maxMP;
-    emit({ type: "rest", floor });
-    finishFloor("cleared", 0, 0);
-  } else {
-    startWave();
-  }
+  // Every floor is a fight now.
+  startWave();
 
   function act(action) {
     if (phase !== "fighting" || !battle) return;
