@@ -1,27 +1,35 @@
-// Home: the avatar dashboard and the live walk loop. Shows level/EXP/HP/MP,
-// wires the pedometer, and (when no pedometer is available) offers manual
-// "walk" controls so the loop is fully testable on web/simulator.
+// Home: the avatar dashboard. Shows level/EXP/HP/MP, the dungeon entry, and a
+// "while you were away" summary of offline idle progress. The game is fully idle
+// — all EXP/loot now come from the dungeon (live auto-descent or offline accrual).
 
 import React from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { useStride } from "../state/StrideContext.js";
-import { useStepSource } from "../steps/useStepSource.js";
 import { unlockedHiddenClasses } from "../../engine/classes.js";
 import ProgressBar from "../components/ProgressBar.js";
 import Avatar, { evolutionStage, STAGE_TITLES } from "../components/Avatar.js";
-import { conversionPreview } from "../game/profile.js";
 import { getJob } from "../../engine/jobs.js";
 import { colors, spacing } from "../theme.js";
 
 const STAGE_THRESHOLDS = [10, 20, 30, 50];
 
+function awayLabel(minutes) {
+  if (minutes >= 60) {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return `${h}h${m ? ` ${m}m` : ""}`;
+  }
+  return `${minutes}m`;
+}
+
 export default function HomeScreen({ onOpenStats, onOpenDungeon, onOpenInventory, onOpenKnowledge }) {
-  const { profile, sheet, vitals, ingestSteps, convert, lastEarned } = useStride();
-  const { available, error, addManualSteps } = useStepSource(ingestSteps);
+  const { profile, sheet, vitals, offlineReport, dismissOfflineReport } = useStride();
 
   const hidden = unlockedHiddenClasses(profile.stats);
-  const preview = conversionPreview(profile);
   const jobName = getJob(profile.job)?.name;
+  const coreCount = offlineReport
+    ? Object.values(offlineReport.cores || {}).reduce((a, b) => a + b, 0)
+    : 0;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -57,6 +65,28 @@ export default function HomeScreen({ onOpenStats, onOpenDungeon, onOpenInventory
         )}
       </View>
 
+      {/* While you were away — offline idle accrual */}
+      {offlineReport && (
+        <View style={[styles.card, styles.awayCard]}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.awayTitle}>While you were away</Text>
+            <Text style={styles.awayTime}>{awayLabel(offlineReport.minutes)}{offlineReport.capped ? " (max)" : ""}</Text>
+          </View>
+          <Text style={styles.awayLine}>
+            +{offlineReport.xp} EXP   ·   +{offlineReport.gold} gold
+            {coreCount > 0 ? `   ·   ${coreCount} core${coreCount === 1 ? "" : "s"}` : ""}
+          </Text>
+          {offlineReport.levelsGained?.length > 0 && (
+            <Text style={styles.awayLevel}>
+              ★ Level up → {offlineReport.levelsGained[offlineReport.levelsGained.length - 1].level}!
+            </Text>
+          )}
+          <Pressable onPress={dismissOfflineReport} style={styles.awayBtn}>
+            <Text style={styles.awayBtnText}>Collect</Text>
+          </Pressable>
+        </View>
+      )}
+
       {/* Resource bars */}
       <View style={styles.card}>
         <ProgressBar label="EXP" value={profile.exp} max={sheet.expToNext} color={colors.exp} />
@@ -73,61 +103,14 @@ export default function HomeScreen({ onOpenStats, onOpenDungeon, onOpenInventory
         </View>
       </View>
 
-      {/* Dungeon entry — free to descend, anytime. */}
+      {/* Dungeon entry — the idle climb. */}
       <Pressable
         style={({ pressed }) => [styles.dungeonBtn, pressed && styles.dungeonBtnPressed]}
         onPress={onOpenDungeon}
       >
         <Text style={styles.dungeonTitle}>⚔  Enter the Dungeon</Text>
-        <Text style={styles.dungeonSub}>Floor {profile.floor || 1} · descend anytime</Text>
+        <Text style={styles.dungeonSub}>Floor {profile.floor || 1} · auto-descend & idle</Text>
       </Pressable>
-
-      {/* Steps: bank + convert */}
-      <View style={styles.card}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.sectionTitle}>Steps</Text>
-          <Text style={styles.bankBig}>{preview.bank.toLocaleString()} banked</Text>
-        </View>
-        {available === true && (
-          <Text style={styles.dim}>📿 Pedometer connected — your steps bank automatically.</Text>
-        )}
-        {available === false && (
-          <Text style={styles.dim}>
-            No pedometer here{error ? ` (${error})` : ""}. Use the buttons below to simulate walking.
-          </Text>
-        )}
-
-        <View style={styles.walkRow}>
-          {[100, 1000, 10000].map((n) => (
-            <Pressable
-              key={n}
-              style={({ pressed }) => [styles.walkBtn, pressed && styles.walkBtnPressed]}
-              onPress={() => addManualSteps(n)}
-            >
-              <Text style={styles.walkBtnText}>+{n.toLocaleString()}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Text style={styles.convertHint}>Convert banked steps — 10 steps = 1 EXP</Text>
-        <View style={styles.walkRow}>
-          <Pressable
-            disabled={preview.xp <= 0}
-            onPress={() => convert()}
-            style={[styles.convertBtn, { borderColor: colors.exp }, preview.xp <= 0 && styles.convertOff]}
-          >
-            <Text style={[styles.convertText, { color: colors.exp }]}>→ EXP  +{preview.xp}</Text>
-          </Pressable>
-        </View>
-        {lastEarned && (
-          <Text style={styles.earned}>
-            Converted {lastEarned.steps.toLocaleString()} steps → +{lastEarned.xp} EXP
-            {lastEarned.levelsGained?.length
-              ? `  •  LEVEL UP → ${lastEarned.levelsGained[lastEarned.levelsGained.length - 1].level}!`
-              : ""}
-          </Text>
-        )}
-      </View>
 
       <Pressable style={styles.statsLink} onPress={onOpenStats}>
         <Text style={styles.statsLinkText}>View stats & allocate points →</Text>
@@ -187,34 +170,22 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(0.75),
   },
   pointsBadgeText: { color: colors.bg, fontWeight: "800", fontSize: 13 },
-  sectionTitle: { color: colors.text, fontSize: 16, fontWeight: "700", marginBottom: spacing(1) },
-  dim: { color: colors.textDim, fontSize: 13, lineHeight: 19 },
+  awayCard: { borderColor: colors.exp },
+  awayTitle: { color: colors.exp, fontSize: 15, fontWeight: "800" },
+  awayTime: { color: colors.textDim, fontSize: 12, fontWeight: "700" },
+  awayLine: { color: colors.text, fontSize: 14, fontWeight: "700", marginTop: spacing(1) },
+  awayLevel: { color: colors.gold, fontSize: 13, fontWeight: "700", marginTop: spacing(0.5) },
+  awayBtn: {
+    marginTop: spacing(1.5), backgroundColor: colors.exp, borderRadius: 10,
+    paddingVertical: spacing(1.1), alignItems: "center",
+  },
+  awayBtnText: { color: colors.bg, fontWeight: "800", fontSize: 14 },
   regen: { color: colors.textDim, fontSize: 11, marginTop: 2, textAlign: "right" },
   statRow: { flexDirection: "row", marginTop: spacing(1.5), justifyContent: "space-between" },
   statCell: { alignItems: "center", flex: 1 },
   statVal: { color: colors.text, fontSize: 16, fontWeight: "700" },
   statKey: { color: colors.textDim, fontSize: 11, marginTop: 2 },
-  walkRow: { flexDirection: "row", marginTop: spacing(1.5), gap: spacing(1) },
-  walkBtn: {
-    flex: 1,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 10,
-    paddingVertical: spacing(1.25),
-    alignItems: "center",
-  },
-  walkBtnPressed: { backgroundColor: colors.border },
-  walkBtnText: { color: colors.accent, fontWeight: "700", fontSize: 14 },
-  earned: { color: colors.accent, fontSize: 13, marginTop: spacing(1.5), fontWeight: "600" },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  bankBig: { color: colors.text, fontSize: 15, fontWeight: "800", marginBottom: spacing(1) },
-  convertHint: { color: colors.textDim, fontSize: 12, marginTop: spacing(1.5) },
-  convertBtn: {
-    flex: 1, backgroundColor: colors.surfaceAlt, borderRadius: 10, borderWidth: 1,
-    paddingVertical: spacing(1.25), alignItems: "center",
-  },
-  convertOff: { opacity: 0.4 },
-  convertText: { fontWeight: "800", fontSize: 14 },
-  capNote: { color: colors.gold, fontSize: 12, marginTop: spacing(1) },
   dungeonBtn: {
     backgroundColor: colors.surfaceAlt,
     borderColor: colors.danger,

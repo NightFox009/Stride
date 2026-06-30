@@ -68,6 +68,7 @@ export default function DungeonScreen({ onBack }) {
   const runRef = useRef(null); // accumulated totals across the descent
   const [, setTick] = useState(0);
   const [ended, setEnded] = useState(null);
+  const [speed, setSpeed] = useState(1); // auto-descent speed multiplier (1/2/4)
   const rerender = () => setTick((t) => t + 1);
 
   const snap = sessionRef.current ? sessionRef.current.snapshot() : null;
@@ -107,9 +108,9 @@ export default function DungeonScreen({ onBack }) {
       setEnded({ outcome: r.outcome, floor: sn.floor, log: sn.log, run: { ...(runRef.current || emptyRun(sn.floor)) } });
       sessionRef.current = null;
       rerender();
-    }, 280);
+    }, Math.round(300 / speed));
     return () => clearInterval(id);
-  }, [beginFloorSession, commitFloorResult]);
+  }, [beginFloorSession, commitFloorResult, speed]);
 
   const floor = profile.floor || 1;
   const type = floorType(floor);
@@ -233,6 +234,20 @@ export default function DungeonScreen({ onBack }) {
         <Text style={styles.runText}>{run.floorsCleared} cleared · +{run.xp} XP · +{run.gold}g</Text>
       </View>
 
+      {/* Speed control */}
+      <View style={styles.speedRow}>
+        <Text style={styles.speedLabel}>Speed</Text>
+        {[1, 2, 4].map((s) => (
+          <Pressable
+            key={s}
+            onPress={() => setSpeed(s)}
+            style={[styles.speedBtn, speed === s && styles.speedBtnOn]}
+          >
+            <Text style={[styles.speedText, speed === s && styles.speedTextOn]}>{s}×</Text>
+          </Pressable>
+        ))}
+      </View>
+
       {/* Enemies */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Enemies</Text>
@@ -315,6 +330,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(1.5), marginBottom: spacing(1.5),
   },
   runText: { color: colors.accent, fontSize: 13, fontWeight: "800" },
+  speedRow: { flexDirection: "row", alignItems: "center", marginBottom: spacing(1.5), gap: spacing(1) },
+  speedLabel: { color: colors.textDim, fontSize: 13, fontWeight: "700", marginRight: spacing(0.5) },
+  speedBtn: {
+    paddingVertical: spacing(0.75), paddingHorizontal: spacing(1.75), borderRadius: 8,
+    backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border,
+  },
+  speedBtnOn: { backgroundColor: colors.exp, borderColor: colors.exp },
+  speedText: { color: colors.textDim, fontSize: 14, fontWeight: "800" },
+  speedTextOn: { color: colors.bg },
   enemyRow: {
     flexDirection: "row", alignItems: "center", paddingVertical: spacing(0.75),
     paddingHorizontal: spacing(1), borderRadius: 8, marginBottom: 4,

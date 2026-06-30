@@ -72,16 +72,16 @@ export function createFloorSession({ floor, stats, skills, skillLevels = {}, pri
   function resolveBattle() {
     const out = battle.outcome;
     if (out === "defeat") {
-      const kept = Math.floor(totalXp * 0.5);
-      emit({ type: "floorDefeat", floor, wave: waveIndex + 1, lostGold: totalGold, xpHalvedTo: kept });
-      finishFloor("defeat", kept, 0);
+      // No death penalty: you keep every bit of XP/gold earned on this floor.
+      // (Loot/materials/cores still need a clear — they only drop on victory.)
+      emit({ type: "floorDefeat", floor, wave: waveIndex + 1, keptXp: totalXp, keptGold: totalGold });
+      finishFloor("defeat", totalXp, totalGold);
       return;
     }
     if (out === "fled") {
-      // Fleeing is a loss: you abandon the run — loot lost, EXP halved.
-      const kept = Math.floor(totalXp * 0.5);
-      emit({ type: "floorFled", floor, wave: waveIndex + 1, keptXp: kept });
-      finishFloor("fled", kept, 0);
+      // Fleeing abandons the run but keeps the XP/gold already earned.
+      emit({ type: "floorFled", floor, wave: waveIndex + 1, keptXp: totalXp, keptGold: totalGold });
+      finishFloor("fled", totalXp, totalGold);
       return;
     }
     // victory

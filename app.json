@@ -12,17 +12,11 @@
     },
     "assetBundlePatterns": ["**/*"],
     "ios": {
-      "supportsTablet": true,
-      "infoPlist": {
-        "NSMotionUsageDescription": "Stride counts your steps to power your avatar's EXP."
-      }
+      "supportsTablet": true
     },
-    "android": {
-      "permissions": ["ACTIVITY_RECOGNITION"]
-    },
+    "android": {},
     "web": {
       "bundler": "metro"
-    },
-    "plugins": ["expo-sensors"]
+    }
   }
 }

@@ -18,7 +18,6 @@ import {
 } from "../../engine/crafting.js";
 import {
   gainExp as engineGainExp,
-  stepsToXP,
   levelHpBonus,
   TUNING,
 } from "../../engine/progression.js";
@@ -52,17 +51,14 @@ export function createProfile(classId) {
     equipment: { weapon: null, subweapon: null, helm: null, armor: null, gloves: null, boots: null, accessory: null },
     materials: {}, // crafting materials: { matId: count }
     knowledge: {}, // bestiary: { enemyId: coreCount }
-    idle: null, // active camp: { floor, since }
     currentHP: null, // carried HP between floors (null = full)
     currentMP: null, // carried MP between floors (null = full)
     lastRestTick: Date.now(), // for time-based HP/MP regen
     gold: 0,
     // Deepest floor not yet cleared — the dungeon's "current floor".
     floor: 1,
-    // Raw steps waiting to be converted into EXP by the player.
-    totalSteps: 0,
-    stepBank: 0,
-    lastSyncAt: Date.now(),
+    // Wall-clock of the last active moment, for offline idle accrual.
+    lastSeenAt: Date.now(),
   };
 }
 
@@ -162,40 +158,6 @@ export function deriveSheet(profile) {
   };
 }
 
-// Banks new steps. Steps no longer auto-convert — the player chooses to spend
-// the bank on EXP via convertSteps().
-export function applySteps(profile, newSteps) {
-  newSteps = Math.max(0, Math.floor(newSteps));
-  if (newSteps === 0) return { profile, earned: { steps: 0 } };
-
-  const p = { ...profile };
-  p.totalSteps += newSteps;
-  p.stepBank = (p.stepBank || 0) + newSteps;
-  p.lastSyncAt = Date.now();
-  return { profile: p, earned: { steps: newSteps } };
-}
-
-// How much EXP the current step bank could yield right now.
-export function conversionPreview(profile) {
-  const bank = profile.stepBank || 0;
-  return { bank, xp: stepsToXP(bank) };
-}
-
-// Convert banked steps into EXP. Consumes only the whole-unit portion; the
-// remainder stays banked. Returns a new profile plus a summary for the UI.
-export function convertSteps(profile) {
-  let p = { ...profile };
-  const bank = p.stepBank || 0;
-  const xp = stepsToXP(bank);
-  if (xp <= 0) return { profile, converted: { steps: 0, xp: 0, levelsGained: [] } };
-  p.stepBank = bank - xp * TUNING.stepsPerXP;
-  const res = engineGainExp(p, xp);
-  p = res.profile;
-  const levelsGained = res.levelsGained;
-  p.skillPoints = (p.skillPoints || 0) + levelsGained.length; // 1 skill point / level
-  return { profile: p, converted: { steps: xp * TUNING.stepsPerXP, xp, levelsGained } };
-}
-
 // Fold a completed dungeon-floor result back into the profile: bank loot, award
 // EXP through the engine (handling level-ups), and advance the floor on a clear.
 // Returns a new profile plus the level-ups gained so the UI can celebrate them.
@@ -245,40 +207,39 @@ export function applyFloorResult(profile, result) {
   return { profile: p, levelsGained };
 }
 
-// ── Idle / camp ──────────────────────────────────────────────
-// Start camping the current floor (passively earns EXP + cores over time).
-export function startCamp(profile) {
-  return { ...profile, idle: { floor: profile.floor || 1, since: Date.now() } };
-}
+// ── Offline idle accrual ─────────────────────────────────────
+// The game is fully idle: while you're away your avatar keeps "descending".
+// We grant deterministic EXP + monster cores (+ a little gold) for the real
+// time elapsed since you were last active, on the same curve the dungeon uses,
+// capped at IDLE_CAP_MS (8h). Returns the updated profile plus a summary for a
+// "while you were away" screen (or null when there's nothing to grant).
+export function applyOfflineProgress(profile, now = Date.now()) {
+  if (!profile) return { profile, rewards: null };
+  const since = profile.lastSeenAt || profile.lastSyncAt || now;
+  const elapsed = now - since;
+  if (elapsed < 60_000) return { profile: { ...profile, lastSeenAt: now }, rewards: null };
 
-// What the active camp has accrued so far (without claiming).
-export function idlePreview(profile, now = Date.now()) {
-  if (!profile.idle) return null;
-  return idleRewards(profile.idle.floor, now - profile.idle.since);
-}
+  const r = idleRewards(profile.floor || 1, elapsed);
+  const hasCores = r.cores && Object.keys(r.cores).length > 0;
+  if (r.xp <= 0 && !hasCores) return { profile: { ...profile, lastSeenAt: now }, rewards: null };
 
-// Claim the camp's accrued rewards and keep camping (resets the clock).
-export function claimCamp(profile, now = Date.now()) {
-  if (!profile.idle) return { profile, rewards: null };
-  const rewards = idleRewards(profile.idle.floor, now - profile.idle.since);
-  let p = { ...profile, idle: { ...profile.idle, since: now } };
-  if (rewards.xp > 0) {
-    const r = engineGainExp(p, rewards.xp);
-    p = r.profile;
-    p.skillPoints = (p.skillPoints || 0) + r.levelsGained.length;
+  let p = { ...profile };
+  let levelsGained = [];
+  if (r.xp > 0) {
+    const g = engineGainExp(p, r.xp);
+    p = g.profile;
+    levelsGained = g.levelsGained;
+    p.skillPoints = (p.skillPoints || 0) + levelsGained.length; // 1 skill point / level
   }
-  if (Object.keys(rewards.cores).length) {
+  if (hasCores) {
     const k = { ...(p.knowledge || {}) };
-    for (const [id, n] of Object.entries(rewards.cores)) k[id] = (k[id] || 0) + n;
+    for (const [id, n] of Object.entries(r.cores)) k[id] = (k[id] || 0) + n;
     p.knowledge = k;
   }
-  return { profile: p, rewards };
-}
-
-// Claim and stop camping.
-export function stopCamp(profile, now = Date.now()) {
-  const { profile: p, rewards } = claimCamp(profile, now);
-  return { profile: { ...p, idle: null }, rewards };
+  const gold = Math.round(r.minutes * (1 + (p.floor || 1) * 0.3));
+  p.gold = (p.gold || 0) + gold;
+  p.lastSeenAt = now;
+  return { profile: p, rewards: { minutes: r.minutes, xp: r.xp, gold, cores: r.cores, capped: r.capped, levelsGained } };
 }
 
 // Find an item by id across inventory and equipped slots.

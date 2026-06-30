@@ -1,5 +1,5 @@
 // Central app state: owns the profile, loads/saves it, and exposes the actions
-// the screens call. This is the single place steps turn into EXP.
+// the screens call. Fully idle: EXP comes from the dungeon (live or offline).
 
 import React, {
   createContext,
@@ -12,12 +12,10 @@ import React, {
 import { loadProfile, saveProfile, clearProfile } from "../game/persistence.js";
 import {
   createProfile,
-  applySteps,
-  convertSteps,
+  applyOfflineProgress,
   applyAllocation,
   applyHpRegen,
   vitals,
-  claimCamp,
   learnSkill,
   awakenJob,
   applyFloorResult,
@@ -40,23 +38,27 @@ const StrideContext = createContext(null);
 export function StrideProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
-  const [lastEarned, setLastEarned] = useState(null);
+  // Summary of what accrued while the app was closed (shown on Home, dismissable).
+  const [offlineReport, setOfflineReport] = useState(null);
 
-  // Keep the freshest profile in a ref so the step callback (registered once)
-  // always applies steps to current state, never a stale closure.
+  // Keep the freshest profile in a ref so callbacks registered once always read
+  // current state, never a stale closure.
   const profileRef = useRef(null);
   profileRef.current = profile;
 
-  // Load the save once on startup (and catch up any offline HP/MP regen).
+  // Load the save once on startup: catch up HP/MP regen, then grant offline idle
+  // progress for the real time elapsed since the player was last active.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const saved = await loadProfile();
       if (!cancelled) {
         let init = saved ? applyHpRegen(saved) : saved;
-        // Camping was removed: credit any old save's accrued idle once, then end
-        // the camp for good so the field stops lingering.
-        if (init && init.idle) init = { ...claimCamp(init).profile, idle: null };
+        if (init) {
+          const off = applyOfflineProgress(init);
+          init = off.profile;
+          if (off.rewards) setOfflineReport(off.rewards);
+        }
         setProfile(init);
         setLoading(false);
       }
@@ -75,10 +77,12 @@ export function StrideProvider({ children }) {
     return () => clearInterval(id);
   }, []);
 
-  // Persist on every meaningful change (debounced lightly).
+  // Persist on every meaningful change (debounced lightly). We stamp lastSeenAt
+  // on the stored copy (not React state) so the offline-accrual clock measures
+  // from the last active moment, without churning renders.
   useEffect(() => {
     if (!profile) return;
-    const id = setTimeout(() => saveProfile(profile), 150);
+    const id = setTimeout(() => saveProfile({ ...profile, lastSeenAt: Date.now() }), 150);
     return () => clearTimeout(id);
   }, [profile]);
 
@@ -89,26 +93,10 @@ export function StrideProvider({ children }) {
   const resetGame = useCallback(async () => {
     await clearProfile();
     setProfile(null);
-    setLastEarned(null);
+    setOfflineReport(null);
   }, []);
 
-  // The walk loop — just banks steps. Conversion to EXP/Energy is a player choice.
-  const ingestSteps = useCallback((steps) => {
-    const current = profileRef.current;
-    if (!current || steps <= 0) return;
-    const { profile: next } = applySteps(current, steps);
-    setProfile(next);
-  }, []);
-
-  // Convert banked steps into EXP. Returns the summary for the UI.
-  const convert = useCallback(() => {
-    const p = profileRef.current;
-    if (!p) return null;
-    const { profile: next, converted } = convertSteps(p);
-    setProfile(next);
-    if (converted.steps > 0) setLastEarned(converted);
-    return converted;
-  }, []);
+  const dismissOfflineReport = useCallback(() => setOfflineReport(null), []);
 
   const allocateStats = useCallback((alloc) => {
     setProfile((p) => (p ? applyAllocation(p, alloc) : p));
@@ -184,11 +172,10 @@ export function StrideProvider({ children }) {
     profile,
     sheet: profile ? deriveSheet(profile) : null,
     vitals: profile ? vitals(profile) : null,
-    lastEarned,
+    offlineReport,
+    dismissOfflineReport,
     startGame,
     resetGame,
-    ingestSteps,
-    convert,
     allocateStats,
     learn,
     awaken,
