@@ -7,7 +7,7 @@ export const colors = {
   border: "#2a313c",
   text: "#e6edf3",
   textDim: "#9aa7b4",
-  accent: "#5ad1a0", // energy / step green
+  accent: "#5ad1a0", // accent green (rewards / highlights)
   exp: "#6ea8fe", // EXP blue
   hp: "#f47174",
   gold: "#e3b341",

@@ -1,6 +1,6 @@
 // The player profile: the persistent save object the whole app revolves around.
 // It is a thin shell over the pure engine — all the real rules (stat formulas,
-// EXP curve, step conversions) live in ../../engine and are imported here so the
+// EXP curve) live in ../../engine and are imported here so the
 // app and the text sim share one source of truth.
 
 import { BASE_CLASSES, startingStatsFor } from "../../engine/classes.js";
