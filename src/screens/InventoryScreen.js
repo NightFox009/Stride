@@ -32,7 +32,7 @@ function costText(cost) {
 }
 
 export default function InventoryScreen({ onBack }) {
-  const { profile, equip, unequip, sell, upgrade, craft } = useStride();
+  const { profile, equip, unequip, sell, upgrade, craft, setAutoEquip } = useStride();
   const [tab, setTab] = useState("weapon");
   const inv = profile.inventory || [];
   const equipment = profile.equipment || {};
@@ -93,6 +93,18 @@ export default function InventoryScreen({ onBack }) {
         <Text style={styles.gold}>{profile.gold || 0} gold</Text>
       </View>
 
+      <Pressable
+        onPress={() => setAutoEquip(!profile.autoEquip)}
+        style={[styles.autoToggle, profile.autoEquip && styles.autoToggleOn]}
+      >
+        <Text style={[styles.autoToggleText, profile.autoEquip && styles.autoToggleTextOn]}>
+          {profile.autoEquip ? "✓ Auto-equip upgrades on" : "Auto-equip upgrades"}
+        </Text>
+        <Text style={styles.autoToggleSub}>
+          {profile.autoEquip ? "stronger drops are equipped automatically" : "equip strictly-better loot for you"}
+        </Text>
+      </Pressable>
+
       {/* Materials */}
       <View style={styles.matRow}>
         {MATERIAL_ORDER.map((m) => (
@@ -152,6 +164,14 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   title: { color: colors.text, fontSize: 28, fontWeight: "800" },
   gold: { color: colors.gold, fontSize: 16, fontWeight: "700" },
+  autoToggle: {
+    backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1,
+    borderRadius: 12, padding: spacing(1.5), marginTop: spacing(1.5),
+  },
+  autoToggleOn: { borderColor: colors.accent },
+  autoToggleText: { color: colors.textDim, fontSize: 14, fontWeight: "800" },
+  autoToggleTextOn: { color: colors.accent },
+  autoToggleSub: { color: colors.textDim, fontSize: 11, marginTop: 2 },
   matRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing(1), marginTop: spacing(1.5) },
   matChip: {
     backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1,

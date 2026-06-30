@@ -25,8 +25,12 @@ const FLOOR_BLURB = {
 const COMBAT_FLOORS = new Set(["combat", "elite", "boss"]);
 
 function emptyRun(floor) {
-  return { startFloor: floor, deepest: floor, floorsCleared: 0, xp: 0, gold: 0, loot: [], levels: [] };
+  return { startFloor: floor, deepest: floor, floorsCleared: 0, deaths: 0, streakDeaths: 0, xp: 0, gold: 0, loot: [], levels: [] };
 }
+
+// Auto-restart gives up after this many deaths in a row with no clear, so a
+// hopeless wall floor doesn't grind forever — the report nudges you to gear up.
+const STUCK_LIMIT = 12;
 
 function formatEvent(e, playerName = "You") {
   switch (e.type) {
@@ -69,6 +73,9 @@ export default function DungeonScreen({ onBack }) {
   const [, setTick] = useState(0);
   const [ended, setEnded] = useState(null);
   const [speed, setSpeed] = useState(1); // auto-descent speed multiplier (1/2/4)
+  const [autoRestart, setAutoRestart] = useState(true); // re-dive automatically on death
+  const autoRestartRef = useRef(true);
+  autoRestartRef.current = autoRestart;
   const rerender = () => setTick((t) => t + 1);
 
   const snap = sessionRef.current ? sessionRef.current.snapshot() : null;
@@ -101,11 +108,21 @@ export default function DungeonScreen({ onBack }) {
       }
 
       if (r.outcome === "cleared") {
+        if (run) run.streakDeaths = 0;
         const next = beginFloorSession(); // reads the freshly advanced floor + carried HP
         if (next) { sessionRef.current = next; committedRef.current = false; rerender(); return; }
+      } else if (r.outcome === "defeat" && autoRestartRef.current && (!run || run.streakDeaths < STUCK_LIMIT)) {
+        // Hands-off idle: respawn (full HP, same floor) and dive again. Each
+        // attempt's XP is kept, so the avatar grinds toward a breakthrough.
+        // Leveling counts as progress and resets the wall counter; only a truly
+        // stalled build (no clears AND no level-ups) stops at STUCK_LIMIT.
+        if (run) { run.deaths += 1; run.streakDeaths = gains?.length ? 0 : run.streakDeaths + 1; }
+        const next = beginFloorSession();
+        if (next) { sessionRef.current = next; committedRef.current = false; rerender(); return; }
       }
-      // The run is over: died, fled, or the next floor couldn't start.
-      setEnded({ outcome: r.outcome, floor: sn.floor, log: sn.log, run: { ...(runRef.current || emptyRun(sn.floor)) } });
+      // The run is over: retreated, fled, auto-restart off, or walled.
+      const walled = r.outcome === "defeat" && autoRestartRef.current && run && run.streakDeaths >= STUCK_LIMIT;
+      setEnded({ outcome: r.outcome, walled, floor: sn.floor, log: sn.log, run: { ...(runRef.current || emptyRun(sn.floor)) } });
       sessionRef.current = null;
       rerender();
     }, Math.round(300 / speed));
@@ -153,6 +170,7 @@ export default function DungeonScreen({ onBack }) {
           <Text style={[styles.outcome, { color: died ? colors.danger : colors.accent }]}>{title}</Text>
           <Text style={styles.rewardLine}>
             {r.floorsCleared} floor{r.floorsCleared === 1 ? "" : "s"} cleared   ·   +{r.xp} XP   ·   +{r.gold} gold
+            {r.deaths > 0 ? `   ·   ${r.deaths} death${r.deaths === 1 ? "" : "s"}` : ""}
           </Text>
           {r.levels.length > 0 && (
             <Text style={styles.levelUp}>★ Level up → {r.levels[r.levels.length - 1].level}!</Text>
@@ -167,7 +185,14 @@ export default function DungeonScreen({ onBack }) {
               ))}
             </View>
           )}
-          {died && <Text style={styles.note}>You respawn at full HP on Floor {profile.floor || 1}. Train up and dive again.</Text>}
+          {ended.walled ? (
+            <Text style={styles.note}>
+              Stuck on Floor {ended.floor} after {r.streakDeaths} tries in a row. Allocate stat points,
+              upgrade gear, or enable auto-allocate/auto-equip, then dive again.
+            </Text>
+          ) : died ? (
+            <Text style={styles.note}>You respawn at full HP on Floor {profile.floor || 1}. Train up and dive again.</Text>
+          ) : null}
           <Pressable onPress={leave} style={({ pressed }) => [styles.descend, pressed && styles.pressed, { backgroundColor: colors.accent, marginTop: spacing(2) }]}>
             <Text style={[styles.descendText, { color: colors.bg }]}>Return</Text>
           </Pressable>
@@ -231,10 +256,12 @@ export default function DungeonScreen({ onBack }) {
 
       <View style={styles.runBar}>
         <Text style={styles.runText}>▼ Descending — auto</Text>
-        <Text style={styles.runText}>{run.floorsCleared} cleared · +{run.xp} XP · +{run.gold}g</Text>
+        <Text style={styles.runText}>
+          {run.floorsCleared} cleared · +{run.xp} XP · +{run.gold}g{run.deaths > 0 ? ` · ${run.deaths}☠` : ""}
+        </Text>
       </View>
 
-      {/* Speed control */}
+      {/* Speed + auto-restart controls */}
       <View style={styles.speedRow}>
         <Text style={styles.speedLabel}>Speed</Text>
         {[1, 2, 4].map((s) => (
@@ -246,6 +273,12 @@ export default function DungeonScreen({ onBack }) {
             <Text style={[styles.speedText, speed === s && styles.speedTextOn]}>{s}×</Text>
           </Pressable>
         ))}
+        <Pressable
+          onPress={() => setAutoRestart((v) => !v)}
+          style={[styles.restartBtn, autoRestart && styles.speedBtnOn]}
+        >
+          <Text style={[styles.speedText, autoRestart && styles.speedTextOn]}>↻ auto-revive</Text>
+        </Pressable>
       </View>
 
       {/* Enemies */}
@@ -339,6 +372,10 @@ const styles = StyleSheet.create({
   speedBtnOn: { backgroundColor: colors.exp, borderColor: colors.exp },
   speedText: { color: colors.textDim, fontSize: 14, fontWeight: "800" },
   speedTextOn: { color: colors.bg },
+  restartBtn: {
+    marginLeft: "auto", paddingVertical: spacing(0.75), paddingHorizontal: spacing(1.25),
+    borderRadius: 8, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border,
+  },
   enemyRow: {
     flexDirection: "row", alignItems: "center", paddingVertical: spacing(0.75),
     paddingHorizontal: spacing(1), borderRadius: 8, marginBottom: 4,

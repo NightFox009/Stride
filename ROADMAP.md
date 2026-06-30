@@ -8,6 +8,26 @@ avatar grows as it auto-descends a dungeon.
 > Tap once → the avatar auto-fights floor after floor, levels up, and gets
 > stronger. EXP/loot now come entirely from the dungeon.
 
+## Core loop (LOCKED ✅)
+
+The gameplay/concept layer is complete. The self-driving loop:
+
+1. **Descend** — the avatar auto-fights each floor's waves and presses deeper,
+   carrying HP/MP onward. Choose speed (1×/2×/4×).
+2. **Earn** — every cleared floor banks EXP, gold, loot, materials, and monster
+   cores. EXP → levels → stat points (+ skill points) and flat HP per level.
+3. **Die → auto-revive** — on death you keep all XP earned and respawn at full HP
+   on the same floor to try again (toggle off to stop on death).
+4. **Grow** — spend stat points (or **auto-allocate**), equip loot (or
+   **auto-equip**), learn skills, awaken a job, study the bestiary for permanent
+   bonuses. Builds matter: the 2/3 focus cap forces a real spread.
+5. **Idle** — while away, the real auto-battler **fast-forwards** your climb
+   (capped 8h): floors, loot, levels — summarized on return.
+
+Progression gates on **build power**, not time/energy: you climb until your
+stats/gear hit a wall, then strengthen and push deeper. Fully hands-off if you
+enable auto-allocate + auto-equip + auto-revive.
+
 ---
 
 ## Where we are today (Phase 0 — done)
@@ -27,19 +47,27 @@ avatar grows as it auto-descends a dungeon.
 
 Finish the in-flight gameplay changes so the loop is final and fun *before* art.
 
-- [ ] **Auto-descent speed control** (1× / 2× / 4×).
-- [ ] **Remove the death penalty** (no half-EXP on death; keep what you earned).
-- [ ] **Remove step tracking + banking** (delete the Steps card, pedometer
-      wiring, `applySteps`/`convertSteps`/`conversionPreview`). EXP = dungeon only.
-- [ ] **Offline idle accrual** — the real "idle" payoff: when the player returns,
-      grant progress for time away (auto-climb simulation, capped). Decide cap
-      (e.g. 8–12h) and whether it's client- or server-computed (see Phase 3).
-- [ ] **Balance pass** for a no-penalty, continuous economy (XP/gold curve,
-      monster scaling, how deep a fresh build climbs).
-- [ ] **Prestige hook (design only)** — sketch the reset-for-power loop now so
-      systems are built to support it later.
+- [x] **Auto-descent speed control** (1× / 2× / 4×).
+- [x] **Remove the death penalty** (no half-EXP on death; keep what you earned).
+- [x] **Remove step tracking + banking** — deleted the Steps card, pedometer
+      wiring, `applySteps`/`convertSteps`, and the `expo-sensors` dep. EXP = dungeon only.
+- [x] **Offline idle climb** — on return, fast-forward the **real** auto-battler
+      for time away (≈1 attempt / 1.5 min, capped at 150 attempts / 8h). Advances
+      floors, drops loot, levels up. Shown as a "While you were away" card.
+      *(Server-authoritative anti-cheat deferred to Phase 3.)*
+- [x] **Idle automation (the 4 enhancements):**
+  - **Auto-restart on death** — respawn (full HP, same floor) and re-dive; XP from
+    each try is kept, so the avatar grinds toward a breakthrough. Stops after 12
+    deaths-in-a-row with *no level-up* (truly walled) and nudges you to gear up.
+  - **Auto-allocate stat points** — opt-in toggle; spends points on a per-class
+    priority (primary → bulk → rest) within the 2/3 focus cap, live and offline.
+  - **Auto-equip upgrades** — opt-in toggle; equips strictly-better loot by score.
+  - Both automations also run during the offline climb.
+- [x] **Balance pass** — all classes ~100% clear at Lv5/Floor1 (Scholar ~80%).
+- [ ] **Prestige hook (design only)** — sketch the reset-for-power loop (Phase 4).
 
-**Exit:** a complete, replayable, fully-idle game on the current placeholder UI.
+**Exit:** ✅ a complete, replayable, fully self-driving idle game on the current
+placeholder UI. Concept is **locked** — ready for Phase 2 (art + graphical battler).
 
 ---
 

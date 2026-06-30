@@ -25,10 +25,9 @@ import {
   upgradeItem,
   craftItemRarity,
   deriveSheet,
-  combatStats,
-  primaryStatOf,
-  allowedWeaponTypes,
-  knowledgeHpBonuses,
+  floorSessionInputs,
+  autoAllocateStats,
+  autoEquipUpgrades,
 } from "../game/profile.js";
 import { createFloorSession } from "../../engine/dungeonSession.js";
 import { createRng } from "../../engine/rng.js";
@@ -126,6 +125,23 @@ export function StrideProvider({ children }) {
     setProfile((p) => (p ? craftItemRarity(p, itemId, createRng()) : p));
   }, []);
 
+  const setAutoAllocate = useCallback((on) => {
+    setProfile((p) => {
+      if (!p) return p;
+      let np = { ...p, autoAllocate: on };
+      if (on) np = autoAllocateStats(np); // spend any pending points right away
+      return np;
+    });
+  }, []);
+  const setAutoEquip = useCallback((on) => {
+    setProfile((p) => {
+      if (!p) return p;
+      let np = { ...p, autoEquip: on };
+      if (on) np = autoEquipUpgrades(np); // equip current upgrades right away
+      return np;
+    });
+  }, []);
+
   // Start an interactive dungeon floor. Returns a session controller (see
   // engine/dungeonSession.js) the screen drives turn by turn. Descents are free
   // and unlimited (idle-style). Rewards are applied later via commitFloorResult.
@@ -135,24 +151,7 @@ export function StrideProvider({ children }) {
     // Catch up HP/MP regen before the descent.
     const regen = applyHpRegen(p);
     if (regen !== p) { p = regen; setProfile(p); }
-    const floor = p.floor || 1;
-    const v = vitals(p);
-    const kb = knowledgeHpBonuses(p);
-    return createFloorSession({
-      floor,
-      stats: combatStats(p), // base + passives + job perk
-      skills: p.skills,
-      skillLevels: p.skillLevels || {},
-      primaryStat: primaryStatOf(p),
-      weaponTypes: allowedWeaponTypes(p),
-      classId: p.classId,
-      knowledgeHP: kb.hp,
-      knowledgeRegen: kb.hpRegen,
-      startHP: v.hp,
-      startMP: v.mp,
-      level: p.level,
-      rng: createRng(),
-    });
+    return createFloorSession(floorSessionInputs(p, createRng()));
   }, []);
 
   // Fold a finished floor's result back into the profile. Returns the level-ups
@@ -184,6 +183,8 @@ export function StrideProvider({ children }) {
     sell,
     upgrade,
     craft,
+    setAutoAllocate,
+    setAutoEquip,
     beginFloorSession,
     commitFloorResult,
   };

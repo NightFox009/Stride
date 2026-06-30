@@ -14,7 +14,7 @@ import { colors, spacing, STAT_COLORS } from "../theme.js";
 const emptyDraft = () => STATS.reduce((o, s) => ((o[s] = 0), o), {});
 
 export default function StatsScreen({ onBack, onOpenSkills, onOpenJobs }) {
-  const { profile, sheet, allocateStats, resetGame } = useStride();
+  const { profile, sheet, allocateStats, setAutoAllocate, resetGame } = useStride();
   const [draft, setDraft] = useState(emptyDraft);
   const [confirmReset, setConfirmReset] = useState(false);
 
@@ -86,6 +86,18 @@ export default function StatsScreen({ onBack, onOpenSkills, onOpenJobs }) {
       <Text style={styles.allocHint}>
         A stat can hold at most 2 of every 3 points earned (cap {cap}) — spread your build.
       </Text>
+
+      <Pressable
+        onPress={() => setAutoAllocate(!profile.autoAllocate)}
+        style={[styles.autoToggle, profile.autoAllocate && styles.autoToggleOn]}
+      >
+        <Text style={[styles.autoToggleText, profile.autoAllocate && styles.autoToggleTextOn]}>
+          {profile.autoAllocate ? "✓ Auto-allocate on" : "Auto-allocate points"}
+        </Text>
+        <Text style={styles.autoToggleSub}>
+          {profile.autoAllocate ? "points spent automatically as you level" : "let the game spend points for you"}
+        </Text>
+      </Pressable>
 
       <View style={[styles.card, styles.radarCard]}>
         <RadarChart data={radarData} size={280} showValues />
@@ -209,7 +221,15 @@ const styles = StyleSheet.create({
   backText: { color: colors.exp, fontSize: 15, fontWeight: "700" },
   title: { color: colors.text, fontSize: 28, fontWeight: "800" },
   points: { color: colors.accent, fontSize: 14, fontWeight: "700" },
-  allocHint: { color: colors.textDim, fontSize: 12, marginBottom: spacing(2), marginTop: 2 },
+  allocHint: { color: colors.textDim, fontSize: 12, marginBottom: spacing(1.5), marginTop: 2 },
+  autoToggle: {
+    backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1,
+    borderRadius: 12, padding: spacing(1.5), marginBottom: spacing(2),
+  },
+  autoToggleOn: { borderColor: colors.accent },
+  autoToggleText: { color: colors.textDim, fontSize: 14, fontWeight: "800" },
+  autoToggleTextOn: { color: colors.accent },
+  autoToggleSub: { color: colors.textDim, fontSize: 11, marginTop: 2 },
   card: {
     backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1,
     borderRadius: 14, padding: spacing(2), marginBottom: spacing(2),

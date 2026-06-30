@@ -8,7 +8,9 @@ import { derive } from "../../engine/stats.js";
 import { effectiveStats, treeFor, maxLevelFor, rankLevelReq } from "../../engine/classTree.js";
 import { getJob, jobsFor, JOB_LEVEL, classWeaponTypes } from "../../engine/jobs.js";
 import { equipmentMods, SLOTS, CLASS_GEAR } from "../../engine/items.js";
-import { idleRewards, knowledgeBonuses } from "../../engine/knowledge.js";
+import { knowledgeBonuses, IDLE_CAP_MS } from "../../engine/knowledge.js";
+import { createFloorSession } from "../../engine/dungeonSession.js";
+import { createRng } from "../../engine/rng.js";
 import {
   upgradeCost,
   rarityUpgradeCost,
@@ -57,6 +59,9 @@ export function createProfile(classId) {
     gold: 0,
     // Deepest floor not yet cleared — the dungeon's "current floor".
     floor: 1,
+    // Idle automation toggles (off by default; player opts in).
+    autoAllocate: false, // auto-spend stat points on level up
+    autoEquip: false,    // auto-equip strictly-better loot
     // Wall-clock of the last active moment, for offline idle accrual.
     lastSeenAt: Date.now(),
   };
@@ -204,42 +209,151 @@ export function applyFloorResult(profile, result) {
   }
   p.lastRestTick = Date.now(); // restart the regen clock after a floor
 
+  // Idle automation (opt-in): spend fresh points and equip upgrades so the
+  // climb keeps getting stronger hands-free. Runs for live AND offline floors.
+  if (p.autoAllocate && (p.statPoints || 0) > 0) p = autoAllocateStats(p);
+  if (p.autoEquip) p = autoEquipUpgrades(p);
+
   return { profile: p, levelsGained };
 }
 
-// ── Offline idle accrual ─────────────────────────────────────
-// The game is fully idle: while you're away your avatar keeps "descending".
-// We grant deterministic EXP + monster cores (+ a little gold) for the real
-// time elapsed since you were last active, on the same curve the dungeon uses,
-// capped at IDLE_CAP_MS (8h). Returns the updated profile plus a summary for a
-// "while you were away" screen (or null when there's nothing to grant).
-export function applyOfflineProgress(profile, now = Date.now()) {
+// ── Idle automation ──────────────────────────────────────────
+// Stable inputs for an interactive floor session, shared by the live dungeon
+// (StrideContext) and the offline climb below so both obey identical rules.
+export function floorSessionInputs(profile, rng = createRng()) {
+  const v = vitals(profile);
+  const kb = knowledgeHpBonuses(profile);
+  return {
+    floor: profile.floor || 1,
+    stats: combatStats(profile),
+    skills: profile.skills,
+    skillLevels: profile.skillLevels || {},
+    primaryStat: primaryStatOf(profile),
+    weaponTypes: allowedWeaponTypes(profile),
+    classId: profile.classId,
+    knowledgeHP: kb.hp,
+    knowledgeRegen: kb.hpRegen,
+    startHP: v.hp,
+    startMP: v.mp,
+    level: profile.level,
+    rng,
+  };
+}
+
+// Stat-point spend order: the class's primary first, then bulk (VIT/END), then
+// the rest. The 2/3 focus cap naturally forces a spread once primary is full.
+function allocationPriority(classId) {
+  const boost = (BASE_CLASSES[classId] || {}).boost || "STR";
+  const rest = ["VIT", "END", "STR", "AGI", "LUK", "INT", "CHA"].filter((s) => s !== boost);
+  return [boost, ...rest];
+}
+
+// Spend every available stat point automatically using that priority.
+export function autoAllocateStats(profile) {
+  let p = profile;
+  const order = allocationPriority(p.classId);
+  let guard = 0;
+  while ((p.statPoints || 0) > 0 && guard++ < 2000) {
+    const cap = maxPerStat(p);
+    const inv = investedPoints(p);
+    let placed = false;
+    for (const s of order) {
+      if ((inv[s] || 0) < cap) {
+        const np = applyAllocation(p, { [s]: 1 });
+        if (np !== p) { p = np; placed = true; break; }
+      }
+    }
+    if (!placed) break;
+  }
+  return p;
+}
+
+// A rough "power" score for comparing gear: summed stat mods (the class's
+// primary weighted), plus a small bump for item upgrade level.
+function itemScore(item, profile) {
+  if (!item) return -1;
+  const primary = (BASE_CLASSES[profile.classId] || {}).boost;
+  let s = 0;
+  for (const [stat, v] of Object.entries(item.mods || {})) s += v * (stat === primary ? 1.5 : 1);
+  return s + (item.level || 0) * 0.5;
+}
+
+// Equip any inventory item that is a strict upgrade for its slot (and legal for
+// the class). Loops until nothing improves, so a multi-slot haul settles fully.
+export function autoEquipUpgrades(profile) {
+  let p = profile;
+  let changed = true, guard = 0;
+  while (changed && guard++ < 20) {
+    changed = false;
+    for (const slot of SLOTS) {
+      let bestItem = null;
+      let bestScore = itemScore(p.equipment ? p.equipment[slot] : null, p);
+      for (const it of p.inventory || []) {
+        if (it.slot !== slot || !canEquipItem(p, it)) continue;
+        const sc = itemScore(it, p);
+        if (sc > bestScore) { bestScore = sc; bestItem = it; }
+      }
+      if (bestItem) {
+        const np = equipItem(p, bestItem.id);
+        if (np !== p) { p = np; changed = true; }
+      }
+    }
+  }
+  return p;
+}
+
+// ── Offline idle climb ───────────────────────────────────────
+// The game is fully idle: while you're away your avatar keeps descending. We
+// fast-forward the REAL auto-battler for a bounded number of floor attempts
+// derived from time elapsed (≈ one attempt per OFFLINE_MS_PER_FLOOR, capped at
+// OFFLINE_MAX_ATTEMPTS and the 8h IDLE_CAP_MS). Because it runs the same engine
+// as live play, it advances floors, drops loot, and can't be cheated beyond the
+// cap. Returns the updated profile + a "while you were away" summary (or null).
+const OFFLINE_MS_PER_FLOOR = 90_000; // ~1 floor attempt per 1.5 min away
+const OFFLINE_MAX_ATTEMPTS = 150;    // hard cap on simulated floor attempts
+
+export function applyOfflineProgress(profile, now = Date.now(), rng = createRng()) {
   if (!profile) return { profile, rewards: null };
   const since = profile.lastSeenAt || profile.lastSyncAt || now;
-  const elapsed = now - since;
+  const capped = now - since >= IDLE_CAP_MS;
+  const elapsed = Math.min(Math.max(0, now - since), IDLE_CAP_MS);
   if (elapsed < 60_000) return { profile: { ...profile, lastSeenAt: now }, rewards: null };
 
-  const r = idleRewards(profile.floor || 1, elapsed);
-  const hasCores = r.cores && Object.keys(r.cores).length > 0;
-  if (r.xp <= 0 && !hasCores) return { profile: { ...profile, lastSeenAt: now }, rewards: null };
-
+  const attempts = Math.min(OFFLINE_MAX_ATTEMPTS, Math.max(1, Math.floor(elapsed / OFFLINE_MS_PER_FLOOR)));
   let p = { ...profile };
-  let levelsGained = [];
-  if (r.xp > 0) {
-    const g = engineGainExp(p, r.xp);
-    p = g.profile;
-    levelsGained = g.levelsGained;
-    p.skillPoints = (p.skillPoints || 0) + levelsGained.length; // 1 skill point / level
+  const summary = {
+    minutes: Math.floor(elapsed / 60000), capped,
+    startFloor: p.floor || 1, startLevel: p.level,
+    endFloor: p.floor || 1, endLevel: p.level,
+    floorsCleared: 0, deaths: 0, xp: 0, gold: 0, loot: [], cores: {}, levelsGained: [],
+  };
+
+  let stuck = 0; // consecutive deaths without a clear — stop grinding a wall
+  for (let i = 0; i < attempts; i++) {
+    if (stuck >= 12) break; // hit a floor it can't beat; stop wasting the budget
+    p = { ...p, currentHP: null, currentMP: null }; // rested between floors while away
+    const s = createFloorSession(floorSessionInputs(p, rng));
+    let guard = 0;
+    while (s.snapshot().phase === "fighting" && guard++ < 5000) s.autoStep();
+    const r = s.snapshot().result;
+    if (!r) break;
+    const { profile: np, levelsGained } = applyFloorResult(p, r);
+    p = np;
+    summary.xp += r.xp || 0;
+    summary.gold += r.gold || 0;
+    if (levelsGained.length) summary.levelsGained.push(...levelsGained);
+    if (r.loot && r.loot.length) summary.loot.push(...r.loot);
+    if (r.cores) for (const [id, n] of Object.entries(r.cores)) summary.cores[id] = (summary.cores[id] || 0) + n;
+    if (r.outcome === "cleared") { summary.floorsCleared++; stuck = 0; }
+    else { summary.deaths++; stuck = levelsGained.length ? 0 : stuck + 1; } // leveling = progress
   }
-  if (hasCores) {
-    const k = { ...(p.knowledge || {}) };
-    for (const [id, n] of Object.entries(r.cores)) k[id] = (k[id] || 0) + n;
-    p.knowledge = k;
-  }
-  const gold = Math.round(r.minutes * (1 + (p.floor || 1) * 0.3));
-  p.gold = (p.gold || 0) + gold;
   p.lastSeenAt = now;
-  return { profile: p, rewards: { minutes: r.minutes, xp: r.xp, gold, cores: r.cores, capped: r.capped, levelsGained } };
+  summary.endFloor = p.floor || 1;
+  summary.endLevel = p.level;
+
+  const got = summary.xp > 0 || summary.gold > 0 || summary.loot.length > 0 ||
+    Object.keys(summary.cores).length > 0 || summary.floorsCleared > 0;
+  return { profile: p, rewards: got ? summary : null };
 }
 
 // Find an item by id across inventory and equipped slots.

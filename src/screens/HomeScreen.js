@@ -65,16 +65,29 @@ export default function HomeScreen({ onOpenStats, onOpenDungeon, onOpenInventory
         )}
       </View>
 
-      {/* While you were away — offline idle accrual */}
+      {/* While you were away — offline idle climb */}
       {offlineReport && (
         <View style={[styles.card, styles.awayCard]}>
           <View style={styles.rowBetween}>
             <Text style={styles.awayTitle}>While you were away</Text>
             <Text style={styles.awayTime}>{awayLabel(offlineReport.minutes)}{offlineReport.capped ? " (max)" : ""}</Text>
           </View>
+          {offlineReport.endFloor > offlineReport.startFloor ? (
+            <Text style={styles.awayClimb}>
+              ⛏ Climbed Floor {offlineReport.startFloor} → {offlineReport.endFloor}
+              {`  ·  ${offlineReport.floorsCleared} cleared`}
+              {offlineReport.deaths > 0 ? `  ·  ${offlineReport.deaths}☠` : ""}
+            </Text>
+          ) : (
+            <Text style={styles.awayClimb}>
+              ⛏ Fought on Floor {offlineReport.startFloor}
+              {offlineReport.deaths > 0 ? `  ·  ${offlineReport.deaths}☠` : ""}
+            </Text>
+          )}
           <Text style={styles.awayLine}>
             +{offlineReport.xp} EXP   ·   +{offlineReport.gold} gold
             {coreCount > 0 ? `   ·   ${coreCount} core${coreCount === 1 ? "" : "s"}` : ""}
+            {offlineReport.loot?.length > 0 ? `   ·   ${offlineReport.loot.length} loot` : ""}
           </Text>
           {offlineReport.levelsGained?.length > 0 && (
             <Text style={styles.awayLevel}>
@@ -173,7 +186,8 @@ const styles = StyleSheet.create({
   awayCard: { borderColor: colors.exp },
   awayTitle: { color: colors.exp, fontSize: 15, fontWeight: "800" },
   awayTime: { color: colors.textDim, fontSize: 12, fontWeight: "700" },
-  awayLine: { color: colors.text, fontSize: 14, fontWeight: "700", marginTop: spacing(1) },
+  awayClimb: { color: colors.gold, fontSize: 13, fontWeight: "700", marginTop: spacing(1) },
+  awayLine: { color: colors.text, fontSize: 14, fontWeight: "700", marginTop: spacing(0.5) },
   awayLevel: { color: colors.gold, fontSize: 13, fontWeight: "700", marginTop: spacing(0.5) },
   awayBtn: {
     marginTop: spacing(1.5), backgroundColor: colors.exp, borderRadius: 10,
